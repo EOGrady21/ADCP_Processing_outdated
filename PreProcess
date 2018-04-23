@@ -1,0 +1,99 @@
+####read data####
+
+adp <- read.adp("M1840000.000", latitude = 48, longitude =45 ) #insert lat and lon from mooring logs
+
+
+#####load initial variables####
+v <- adp[['v']]
+pressure <- adp[['pressure']]
+lat <- adp[['latitude']] 
+lon <- adp[['longitude']]
+
+
+
+#### microcat pressure to depth####
+  # pressure data from ADCP is converted into depth of seawater using swDepth function,
+  # depth data can also be acessed by oce package directly, although this data is not corrected for specific temperature and pressure. 
+  # pre and post deployment data is removed based on depth < 0 (above water surface).
+  #Depth is plotted over time series to check for drift or bad data from movement of mooring or transducer
+  # Depth is averaged over entire deployment.
+  
+d <- adp[['depth']]
+
+#using swDepth
+d <- swDepth(pressure, latitude = lat, eos = getOption("oceEOS", default = "gsw"))
+
+#plot subset, visually check for drift
+plot(subset(d, d >0))
+
+#trim depth data
+depth <- subset(d, d>0)
+
+#average depth data
+meanDepth <- adp[['depthMean']] #calculated by oce / instrument
+
+depthMean <- mean(depth) #calculated after trimming shipborne data
+
+####Transducer depth calculations using mooring separation or oce script####
+#subtract mooring separation distance (source: log sheet, units = m)
+mooringSep <- 3
+transDepth <- meanDepth - mooringSep
+
+#compare to oce output
+transducerDepth <- adp[['transducerDepth']]
+
+####Bin 1 calculations####
+  #distance to bin 1 is extracted from adp class file in oce, 
+  #transducer depth is subtracted to find the mean depth of the first bin
+
+#distance to bin 1
+distanceToBin1 <- adp[['bin1Distance']]
+
+#bin 1 distance - transducer depth
+bin1Depth <- distanceToBin1 - transducerDepth
+
+####Correction for magnetic variation over time series###
+   #magnetic declination is calculated and applied to data series
+   #method 1 shows magnetic declination averaged between start and end dates
+   #method 2 shows magnetic declination calculated as a time series
+   
+
+#start and end times
+startTime <- adp[['time']][1]
+endTime <- max(adp[['time']])
+
+#method 1
+  #magnetic declination calculation at start and end of deployment using oce
+  mStart <- magneticField(lon, lat, startTime)
+  mEnd <- magneticField(lon, lat, endTime)
+
+  #averaging start and end declinations
+  mAvg <- round(mean(mStart$declination, mEnd$declination), digits = 2)
+
+  #applying declination to velocty data
+  applyMagneticDeclination(v, declination = mAvg, debug = getOption("oceDebug")) #cannot apply to array?
+
+#Method 2
+#
+#
+#
+#
+
+
+####Thresholding data to prevent spikes or bad data with interference####
+  #thresholding is done by setting minimum percent good on data
+       # minimum of 25 % good on beams 1 and 4 combined, represents percent good of 3 beam solutions plus 4 beam solutions
+       # source: BIO scientists (documentation:)
+  #threshold of error velocities
+        # null/ flag any data with error velocities higher than 1.5 ft/sec or 0.46 m/sec depending on a variety of factors
+        #source: USGS, documentation: https://water.usgs.gov/admin/memo/SW/OSW.2002.03.htm
+
+#plot percent good pings
+plot(adp, which = c(70:73), decimate = FALSE)
+
+
+
+
+
+
+
