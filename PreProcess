@@ -1,3 +1,5 @@
+library(oce)
+
 ####read data####
 
 adp <- read.adp("M1840000.000", latitude = 48, longitude =45 ) #insert lat and lon from mooring logs
