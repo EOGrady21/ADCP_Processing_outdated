@@ -4,6 +4,9 @@ library(oce)
 
 adp <- read.adp("M1840000.000", latitude = 48, longitude =45 ) #insert lat and lon from mooring logs
 
+#read data in again and leave in raw to compare when processing
+adp_raw <- read.adp("M1840000.000")
+
 
 #####load initial variables####
 v <- adp[['v']]
@@ -30,11 +33,12 @@ plot(subset(d, d >0))
 
 #trim depth data
 depth <- subset(d, d>0)
+adp[['depth']] <- depth
 
 #average depth data
-meanDepth <- adp[['depthMean']] #calculated by oce / instrument
+meanDepth_oce <- adp[['depthMean']] #calculated by oce / instrument
 
-depthMean <- mean(depth) #calculated after trimming shipborne data
+meanDepth_trimmed <- mean(depth) #calculated after trimming surafce/erroneous data
 
 ####Transducer depth calculations using mooring separation or oce script####
 #subtract mooring separation distance (source: log sheet, units = m)
@@ -70,10 +74,10 @@ endTime <- max(adp[['time']])
   mEnd <- magneticField(lon, lat, endTime)
 
   #averaging start and end declinations
-  mAvg <- round(mean(mStart$declination, mEnd$declination), digits = 2)
+  mAvg <- round(mean(c(mStart$declination, mEnd$declination)), digits = 2)
 
   #applying declination to velocty data
-  applyMagneticDeclination(v, declination = mAvg, debug = getOption("oceDebug")) #cannot apply to array?
+ toEnu(adp, declination = 'mAvg')
 
 #Method 2
 #
@@ -93,9 +97,42 @@ endTime <- max(adp[['time']])
 #plot percent good pings
 plot(adp, which = c(70:73), decimate = FALSE)
 
+#read in percent good as integer (out of raw format)
+g <- adp[['g', "numeric"]]
+
+#combine beam 1 and 4
+lowpg <- g[,,1]+g[,,4]
+
+#values below 25 %good are flagged
+flag_1 <- matrix(adp[['v']][lowpg<25])  #flag
+
+#null (NA) velocity  values below PG1 + PG4 = 25
+adp[['v']][lowpg < 25] <- NA
+
+#null (NA) percent good values below PG1 + PG4 = 25
+adp[['g', "numeric"]][lowpg <25] <- NA
 
 
+#visually check how much data has been nulled
+plot(adp, which = 1)
+plot(adp_raw, which = 1)
+
+plot(adp, which = 70:73)
+plot(adp_raw, which = 70:73)
 
 
+#null error velocities >1.5 ft/sec or 0.46 m/sec source:https://water.usgs.gov/admin/memo/SW/OSW.2002.03.htm
 
+
+ERRV <- adp[['v']][,,4]
+higherrv <- abs(ERRV) > 0.46 
+flag_2 <- higherrv            #flagged values
+
+
+#null (NA) velocity values with error velocity >0.46 m/sec
+adp[['v']][higherrv] <- NA  
+
+#visually check how much data has been nulled
+plot(adp, which = 4)
+plot(adp_raw, which = 4)
 
