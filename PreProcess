@@ -40,6 +40,10 @@ meanDepth_oce <- adp[['depthMean']] #calculated by oce / instrument
 
 meanDepth_trimmed <- mean(depth) #calculated after trimming surafce/erroneous data
 
+#optional if data is drifting
+  #depth <- subset(depth, depth < meanDepth+2)
+
+
 ####Transducer depth calculations using mooring separation or oce script####
 #subtract mooring separation distance (source: log sheet, units = m)
 mooringSep <- 3
@@ -126,8 +130,7 @@ plot(adp_raw, which = 70:73)
 
 ERRV <- adp[['v']][,,4]
 higherrv <- abs(ERRV) > 0.46 
-flag_2 <- higherrv            #flagged values
-
+flag_2 <- matrix(adp[['v']][higherrv])      #flagged values
 
 #null (NA) velocity values with error velocity >0.46 m/sec
 adp[['v']][higherrv] <- NA  
@@ -135,4 +138,30 @@ adp[['v']][higherrv] <- NA
 #visually check how much data has been nulled
 plot(adp, which = 4)
 plot(adp_raw, which = 4)
+
+
+
+####data output####
+#extract velocity components
+EWCT <- adp[['v']][,,1] #U
+NSCT <- adp[['v']][,,2] #V
+VCSP <- adp[['v']][,,3] #vertical velocity
+ERRV <- adp[['v']][,,4] #error velocity
+
+#percent good
+PG1 <- adp[['g', 'numeric']][,,1]
+PG2 <- adp[['g', 'numeric']][,,2]
+PG3 <- adp[['g', 'numeric']][,,3]
+PG4 <- adp[['g', 'numeric']][,,4]
+
+#flags on velocity values
+flag_1  #low percent good (PG1 +PG4 < 25)
+flag_2  #high error velocity (ERRV > 0.46 m/sec)
+
+#onboard sensor data #correct variable names?
+TEMP <- adp[['temperature']]  #temperature
+BEAM <- adp[['a']]            #average echo intensity
+PITCH <- adp[['pitch']]       #pitch
+ROLL <- adp[['roll']]         #roll
+
 
