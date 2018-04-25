@@ -3,6 +3,15 @@ library(oce)
 adp <- read.adp('MM1840000.000')
 
 
+#quick basic plots (warning: decimated (averaging data for wuick plotting))
+plot(adp, which = 'velocity')
+plot(adp, which = 'amplitude')
+plot(adp, whcih = 'quality')
+plot(adp, which = 'hydrography')
+plot(adp, which = 'angles')
+
+
+
 ####plot depth averaged means
 ####data output####
 #extract velocity components
@@ -10,6 +19,7 @@ EWCT <- adp[['v']][,,1] #U
 NSCT <- adp[['v']][,,2] #V
 VCSP <- adp[['v']][,,3] #vertical velocity
 ERRV <- adp[['v']][,,4] #error velocity
+time <- adp[['time']]   #time
 
 #average over depth for entire matrix, then plot
 EWCT_avg <- colMeans(t(EWCT), na.rm = TRUE)
