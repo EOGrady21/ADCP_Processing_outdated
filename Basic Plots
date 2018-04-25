@@ -3,7 +3,7 @@ library(oce)
 adp <- read.adp('MM1840000.000')
 
 
-#quick basic plots (warning: decimated (averaging data for wuick plotting))
+#quick basic plots (warning: decimated (averaging data for quick plotting))
 plot(adp, which = 'velocity')
 plot(adp, which = 'amplitude')
 plot(adp, whcih = 'quality')
