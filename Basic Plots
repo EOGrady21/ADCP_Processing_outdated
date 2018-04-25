@@ -1,0 +1,79 @@
+library(oce)
+#read in ADCP data
+adp <- read.adp('MM1840000.000')
+
+
+####plot depth averaged means
+####data output####
+#extract velocity components
+EWCT <- adp[['v']][,,1] #U
+NSCT <- adp[['v']][,,2] #V
+VCSP <- adp[['v']][,,3] #vertical velocity
+ERRV <- adp[['v']][,,4] #error velocity
+
+#average over depth for entire matrix, then plot
+EWCT_avg <- colMeans(t(EWCT), na.rm = TRUE)
+plot(time, EWCT_avg, type = 'l', ylab= 'm/sec')
+mtext('EWCT Depth Averaged', side = 3)
+
+#repeat for other velocity components
+NSCT_avg <- colMeans(t(NSCT), na.rm = TRUE)
+plot(time, NSCT_avg, type = 'l', ylab = 'm/sec')
+mtext('NSCT Depth Averaged', side = 3)
+
+VCSP_avg <- colMeans(t(VCSP), na.rm = TRUE)
+plot(time, VCSP_avg, type = 'l', ylab = 'm/sec')
+mtext('VCSP Depth Averaged', side = 3)
+
+
+####plotting echo intensity####
+
+#cut off above surface echo intensity
+adp[['a', 'numeric']][,25:40,] <- NA
+
+#extract each beam, average by depth (bin)
+BEAM_01 <- adp[['a', 'numeric']][,,1]
+BEAM_01_avg <- colMeans(BEAM_01, na.rm = TRUE)
+
+BEAM_02 <- adp[['a', 'numeric']][,,2]
+BEAM_02_avg <- colMeans(BEAM_02, na.rm = TRUE)
+
+BEAM_03 <- adp[['a', 'numeric']][,,3]
+BEAM_03_avg <- colMeans(BEAM_03, na.rm = TRUE)
+
+BEAM_04 <- adp[['a', 'numeric']][,,4]
+BEAM_04_avg <- colMeans(BEAM_04, na.rm = TRUE)
+
+
+
+bin_number <- c(1:40)       #number of bins
+
+#plot all 4 beams on same axis with legend
+plot(BEAM_01_avg, bin_number, type = 'l', ylab = 'bin number', xlab = 'Echo Intensity')
+plot(BEAM_01_avg[1:16], bin_number[1:16], xlim = c(80, 160), type = 'l', ylab = 'bin number', xlab = 'Echo Intensity')
+lines(BEAM_02_avg[1:16], bin_number[1:16], axes = FALSE, col = 'green')
+lines(BEAM_03_avg[1:16], bin_number[1:16], axes = FALSE, col = 'red')
+lines(BEAM_04_avg[1:16], bin_number[1:16], axes = FALSE, col = 'blue')
+legend('topright', legend = c('beam 1', 'beam 2', 'beam 3', 'beam 4'), col = c('black', 'green', 'red', 'blue'), lty= 1)
+
+
+
+####percent good plots####
+#extract percent good
+g <- adp[['g', "numeric"]]
+#combine beams 1 and 4 (beam 1 and 4 together are used to threshold data so this is most applicable)
+lowpg <- g[,,1]+g[,,4]
+
+#separate by bin (can choose any step increment, set to 10 by default to give general plots)
+pg_bin40 <- lowpg[,40]
+pg_bin30 <- lowpg[,30]
+pg_bin20 <- lowpg[,20]
+pg_bin10 <- lowpg[,10]
+
+#put all the plots on same layout page
+layout(matrix(c(1,2,3)))
+plot(adp[['time']], pg_bin40, type = 'l', ylab = '%', xlab = '')
+plot(adp[['time']], pg_bin30, type = 'l', ylab = '%', xlab = '')
+plot(adp[['time']], pg_bin20, type = 'l', ylab = '%', xlab = '')
+plot(adp[['time']], pg_bin10, type = 'l', ylab = '%', xlab = '')
+
