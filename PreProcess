@@ -97,6 +97,27 @@ distanceToBin1 <- adp[['bin1Distance']]
 #bin 1 distance - transducer depth
 bin1Depth <- distanceToBin1 - transducerDepth
 
+
+####Eliminate data above surface contamination####
+     #upward facing ADCPs ping off the surface which creates anomolies and spikes in the data 
+     #data is cut off at discretion of researcher, typically using mean depth to calculate distance to surface
+     
+distance <- adp[['distance', 'numeric']]
+
+distance <- subset(distance, distance < meanDepth_trimmed)   
+str(distance)                                                #check dimensions
+
+flag_3 <- matrix(adp[['v']][distance >250])                 #creates flag matrix to mark data in processing log
+
+#null data above surface using inverse of dimensions from 'distance'
+          #for example, sample data has 40 bins, str(distance) returns a 1:24 matrix,
+          # this means there are 24 bins below the meanDepth which are not contaminated by surface (in theory)
+          # to remove the bins above the surface you would remove bins 25:40
+          
+adp[['v']][,25:40,] <- NA
+
+  
+
 ####Correction for magnetic variation over time series###
    #magnetic declination is calculated and applied to data series
    #method 1 shows magnetic declination averaged between start and end dates
