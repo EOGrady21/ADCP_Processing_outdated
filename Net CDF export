@@ -1,0 +1,93 @@
+#### to export raw ADCP data into a net cdf file for easy transport and archiving####
+
+# lay out path and file name
+
+ncpath <- "/Users/ChisholmE/Desktop/"
+ncname <- "ADP_test01"
+ncfname <- paste(ncpath, ncname, ".nc", sep = "")
+
+#define dimensions of data
+
+timedim <- ncdim_def("time", "POSIXct", as.double(time))
+depthdim <- ncdim_def("distance", "m", as.double(distance))
+londim <- ncdim_def("lon", "degrees_east", as.double(lon))
+latdim <- ncdim_def("lat", "degrees_north", as.double(lat))
+
+#define fill value
+
+fillvalue <- 1e35
+
+#define variable names
+
+dlname <- "Eastward velocity"
+u_def <- ncvar_def("EWCT", "m/sec", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+
+dlname <- "Northward Velocity"
+v_def <- ncvar_def("NSCT", "m/sec", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+
+dlname <- "Vertical Velocity"
+w_def <- ncvar_def("VSCP", "m/sec", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+
+dlname <- "time_02"
+t_def <- ncvar_def("t", "POSIXct", list(depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+
+dlname <- "Error Velocity"
+e_def <- ncvar_def("ERRV", "m/sec", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+
+dlname <- "Beam_01"
+b1_def <- ncvar_def("BEAM_01", "a", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+
+dlname <- "BEAM_02"
+b2_def <- ncvar_def("BEAM_02", "a", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+
+dlname <- "BEAM_03"
+b3_def <- ncvar_def("BEAM_03", "a", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+
+dlname <- "BEAM_04"
+b4_def <- ncvar_def("BEAM_04", "a", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+
+dlname <- "PG_1"
+pg1_def <- ncvar_def("PG1", "counts", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+
+dlname <- "PG_2"
+pg2_def <- ncvar_def("PG2", "counts", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+
+dlname <- "PG3"
+pg3_def <- ncvar_def("PG3", "counts", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+
+dlname <- "PG4"
+pg4_def <- ncvar_def("PG4", "counts", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+
+
+#create NC file
+
+ncout <- nc_create(ncfname, list(u_def, v_def, w_def, e_def, t_def, b1_def, b2_def, b3_def, b4_def, pg1_def, pg2_def, pg3_def, pg4_def), force_v4 = TRUE)
+
+#insert variables
+
+ncvar_put(ncout, u_def, EWCT)
+ncvar_put(ncout, v_def, NSCT)
+ncvar_put(ncout, w_def, VCSP)
+ncvar_put(ncout, e_def, ERRV)
+ncvar_put(ncout, t_def, t)
+ncvar_put(ncout, b1_def, BEAM_01)
+ncvar_put(ncout, b2_def, BEAM_02)
+ncvar_put(ncout, b3_def, BEAM_03)
+ncvar_put(ncout, b4_def, BEAM_04)
+ncvar_put(ncout, pg1_def, PG1)
+ncvar_put(ncout, pg2_def, PG2)
+ncvar_put(ncout, pg3_def, PG3)
+ncvar_put(ncout, pg4_def, PG4)
+
+#insert global attributes
+
+ncatt_put(ncout, 0, "title", "ADCP TEST")
+ncatt_put(ncout, 0, 'latitude', lat)
+ncatt_put(ncout, 0, 'longitude', lon)
+ncatt_put(ncout, 0, 'Distance_to_bin_1', distanceToBin1)
+ncatt_put(ncout, 0, "Mean Depth", meanDepth_trimmed)
+
+#summary and close
+ncout
+
+nc_close(ncout)
