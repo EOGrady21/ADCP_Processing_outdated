@@ -104,7 +104,7 @@ bin1Depth <- distanceToBin1 - transducerDepth
      
 distance <- adp[['distance', 'numeric']]
 
-distance <- subset(distance, distance < meanDepth_trimmed)   
+distance <- subset(distance, distance < meanDepth_trimmed - 10)            #bins within 10 m of surface are typically thrown away (Roger)
 str(distance)                                                #check dimensions
 
 flag_3 <- matrix(adp[['v']][distance >250])                 #creates flag matrix to mark data in processing log
