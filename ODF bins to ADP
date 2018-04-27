@@ -261,3 +261,7 @@ adp <- oceSetMetadata(adp, 'type', type)
 adp <- oceSetMetadata(adp, 'waterDepth', waterDepth)
 adp <- oceSetMetadata(adp, 'units', units)
 
+#to add to an existing metadata list, changing value while retaining structure
+#example
+adp@metadata$orientation <- 'upward'
+
