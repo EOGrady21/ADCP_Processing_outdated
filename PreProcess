@@ -97,6 +97,60 @@ distanceToBin1 <- adp[['bin1Distance']]
 #bin 1 distance - transducer depth
 bin1Depth <- distanceToBin1 - transducerDepth
 
+####Create flags for data outside bounds ####update to include all flags in one array
+#threshold based on BIO standards, 
+#flag_1: minimum percent good, flag <- PG1 +PG4 < 25 
+#flag_2: maximum error velocity, flag <- ERRV > 0.46 m/sec
+#flag_3 : to prevent surface contamination, flag <- distance > (meandepth - 10), 
+
+#flag_1
+    #read in pg per beam
+      g <- adp[['g', "numeric"]]
+
+    #combine beam 1 and 4
+      lowpg <- g[,,1]+g[,,4]
+
+    #create flag array
+       dim <- dim(v)
+       flag_1 <- array(FALSE, dim= dim)
+       for (i in 1:4)
+          flag_1[,,i] <- lowpg<25
+
+    #insert  flag into adp object
+      adp@metadata$flags[["1"]] <- flag_1
+
+#flag_2
+    #extract error velocities
+        ERRV <- adp[['v']][,,4]
+
+    # set maximum error velocity
+        higherrv <- abs(ERRV) > 0.46 
+
+    #create flag matrix of data points exceeding maximum error
+    #create flag array
+        dim <- dim(v)
+        flag_2 <- array(FALSE, dim= dim)
+        for (i in 1:4)
+          flag_2[,,i] <- (ERRV > 0.46)
+
+    #insert  flag into adp object
+        adp@metadata$flags[["2"]] <- flag_2
+
+
+#flag_3
+    #extract distance from adp object
+        dist <- adp[['distance', 'numeric']]
+
+    #create flag matrix of data above surface
+        dim <- dim(v)
+        flag_3 <- array(FALSE, dim= dim)
+        for (i in 1:4)
+            flag_3[,,i] <- dist > (meanDepth_trimmed - 10)
+
+    #insert flag into ADP object
+        adp@metadata$flags[["3"]] <- flag_3
+
+
 
 ####Eliminate data above surface contamination####
      #upward facing ADCPs ping off the surface which creates anomolies and spikes in the data 
@@ -107,7 +161,6 @@ distance <- adp[['distance', 'numeric']]
 distance <- subset(distance, distance < meanDepth_trimmed - 10)            #bins within 10 m of surface are typically thrown away (Roger)
 str(distance)                                                #check dimensions
 
-flag_3 <- matrix(adp[['v']][distance >250])                 #creates flag matrix to mark data in processing log
 
 #null data above surface using inverse of dimensions from 'distance'
           #for example, sample data has 40 bins, str(distance) returns a 1:24 matrix,
@@ -163,22 +216,14 @@ g <- adp[['g', "numeric"]]
 #combine beam 1 and 4
 lowpg <- g[,,1]+g[,,4]
 
-#values below 25 %good are flagged
-flag_1 <- matrix(adp[['v']][lowpg<25])  #flag
 
 #null (NA) velocity  values below PG1 + PG4 = 25
 adp[['v']][lowpg < 25] <- NA
-
-#null (NA) percent good values below PG1 + PG4 = 25
-adp[['g', "numeric"]][lowpg <25] <- NA
 
 
 #visually check how much data has been nulled
 plot(adp, which = 1)
 plot(adp_raw, which = 1)
-
-plot(adp, which = 70:73)
-plot(adp_raw, which = 70:73)
 
 
 #null error velocities >1.5 ft/sec or 0.46 m/sec source:https://water.usgs.gov/admin/memo/SW/OSW.2002.03.htm
@@ -186,7 +231,6 @@ plot(adp_raw, which = 70:73)
 
 ERRV <- adp[['v']][,,4]
 higherrv <- abs(ERRV) > 0.46 
-flag_2 <- matrix(adp[['v']][higherrv])      #flagged values
 
 #null (NA) velocity values with error velocity >0.46 m/sec
 adp[['v']][higherrv] <- NA  
@@ -213,6 +257,7 @@ PG4 <- adp[['g', 'numeric']][,,4]
 #flags on velocity values
 flag_1  #low percent good (PG1 +PG4 < 25)
 flag_2  #high error velocity (ERRV > 0.46 m/sec)
+flag_3  #greater than distance to surface
 
 #onboard sensor data #correct variable names?
 TEMP <- adp[['temperature']]  #temperature

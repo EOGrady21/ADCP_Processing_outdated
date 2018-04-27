@@ -1,0 +1,263 @@
+####read ODF to create ADP object in oce####
+
+#archived data at BIO is typically stored in multiple odf files, one file per ADCP 'bin' or depth
+#this script converts a series of odf files into an adp object in oce, 
+#which can then be further processed, manipulated or exported to other file formats
+
+library(oce)
+library(ncdf4)
+
+library(chron)
+library(lattice)
+
+
+
+#read in ODFs, working directory should be set to a folder with copies of odf files for a particular instrument/ time series
+od <- list.files(path = ".", pattern = "*.ODF")
+odf <- read.odf(od[1])
+
+# reads all odfs into one oce object
+odf.list <- list()
+for (k in 1:length(od)){
+  odf.list[[k]] <- read.odf(od[k])
+}
+
+#check out some basic metadata
+odf.list[[1]][['metadata']]
+
+#data variable names from first odf (assuming all are the same)
+dataNamesOriginal <- odf[['dataNamesOriginal']]
+
+#units (pulled from first odf)
+units <- odf[['units']]
+
+#other metadata (pulled from first odf)
+type <- odf[['type']]
+model <- odf[['model']]
+serialNumber <- odf[['serialNumber']]
+eventNumber <- odf[['eventNumber']]
+eventQualifier <- odf[['eventQualifier']]
+ship <- odf[['ship']]
+scientist <- odf[['scientist']]
+institute <- odf[['institute']]
+cruise <- odf[['cruise']]
+station <- odf[['station']]
+countryInstituteCode <- odf[['countryInstituteCode']]
+cruiseNumber <- odf[['cruiseNumber']]
+date <- odf[['date']]
+startTime <- odf[['startTime']]
+lat <- odf[['latitude']]
+lon <- odf[['longitude']]
+waterDepth <- odf[['waterDepth']]
+depthMin <- odf[['depthMin']]
+depthMax <- odf[['depthMax']]
+sounding <- odf[['sounding']]
+sampleInterval <- odf[['sampleInterval']]
+
+
+
+#extract data from subset of odf list, for each variable that is present in odf files 
+#first create a list which contains the variable values from each odf file in succession
+#insert each 'item' of this list (a string of values) into a column of an empty matrix (each column representing a depth bin)
+
+
+#create list of variable (u) and read u data from each odf file
+u.list <- list()
+for (i in 1:length(odf.list)){
+  u.list[[i]] <- odf.list[[i]]@data$u
+}
+
+#open empty u matrix, insert each vector of u data into a column of matrix
+u <- matrix(data = 0, nrow = length(odf.list[[1]]@data$u), ncol = length(odf.list))
+
+for ( i in 1:length(u.list)){
+  u[,i] <- u.list[[i]]
+}
+
+#create list of variable (v) to read v data from each odf file
+v.list <- list()
+for (i in 1:length(odf.list)){
+  v.list[[i]] <- odf.list[[i]]@data$v
+}
+
+#open empty v matrix
+v <- matrix(data = 0, nrow = length(odf.list[[1]]@data$v), ncol = length(odf.list))
+
+#insert values from v list into columns of matrix
+for ( i in 1:length(v.list)){
+  v[,i] <- v.list[[i]]
+}
+
+
+#create list of variable (w)
+w.list <- list()
+for (i in 1:length(odf.list)){
+  w.list[[i]] <- odf.list[[i]]@data$w
+}
+
+#(open empty w matrix)
+w <- matrix(data = 0, nrow = length(odf.list[[1]]@data$w), ncol = length(odf.list))
+
+#insert values from w list into columns of matrix
+for ( i in 1:length(w.list)){
+  w[,i] <- w.list[[i]]
+}
+
+
+#create list of variable (error)
+error.list <- list()
+for (i in 1:length(odf.list)){
+  error.list[[i]] <- odf.list[[i]]@data$error
+}
+
+#(open empty error matrix)
+error <- matrix(data = 0, nrow = length(odf.list[[1]]@data$error), ncol = length(odf.list))
+
+#insert values from error list into columns of matrix
+for ( i in 1:length(error.list)){
+  error[,i] <- error.list[[i]]
+}
+
+#create list of variable (a)
+a.list <- list()
+for (i in 1:length(odf.list)){
+  a.list[[i]] <- odf.list[[i]]@data$a
+}
+
+#(open empty a matrix)
+a <- matrix(data = 0, nrow = length(odf.list[[1]]@data$a), ncol = length(odf.list))
+
+#insert values from a list into columns of matrix
+for ( i in 1:length(a.list)){
+  a[,i] <- a.list[[i]]
+}
+
+#create list of variable (unknown)
+unknown.list <- list()
+for (i in 1:length(odf.list)){
+  unknown.list[[i]] <- odf.list[[i]]@data$unknown
+}
+
+#(open empty unknown matrix)
+unknown <- matrix(data = 0, nrow = length(odf.list[[1]]@data$unknown), ncol = length(odf.list))
+
+#insert values from unknown list into columns of matrix
+for ( i in 1:length(unknown.list)){
+  unknown[,i] <- unknown.list[[i]]
+}
+
+
+#create list of variable (time)
+time.list <- list()
+for (i in 1:length(odf.list)){
+  time.list[[i]] <- odf.list[[i]]@data$time
+}
+
+#(open empty time matrix)
+time <- matrix(data = 0, nrow = length(odf.list[[1]]@data$time), ncol = length(odf.list))
+
+#insert values from time list into columns of matrix
+for ( i in 1:length(time.list)){
+  unknown[,i] <- unknown.list[[i]]
+}
+
+
+
+#associate depths with each bin so that data can be properly plotted
+#each odf contains max and min depths, average these values for each bin to get a mean depth or centre point of the bin
+
+#list of max depths
+depthMax.list <- list()
+for (i in 1:length(odf.list)){
+  depthMax.list[[i]] <- odf.list[[i]]@metadata$depthMax
+}
+
+#list of min depths
+depthMin.list <- list()
+for (i in 1:length(odf.list)){
+  depthMin.list[[i]] <- odf.list[[i]]@metadata$depthMin
+}
+
+
+#get mean depth
+depth <- matrix(data = 0 , nrow = length(depthMax.list), ncol = 2)
+
+for(i in 1: length(depthMax.list)){
+  depth[i, 1] <- depthMax.list[[i]]
+}
+
+for(i in 1: length(depthMin.list)){
+  depth[i, 2] <- depthMin.list[[i]]
+}
+
+#creates list of mean depths for each odf bin
+depthMean <- rowMeans(depth)
+
+
+#create time variable
+time <- odf[['time']]
+
+
+#combine u, v, w into array for adp object
+#array dimensions should be time : depth : 4 (number of beams)
+
+k = length(time) ; m = length(depthMean) ; l = 4
+#create empty velocity array
+adpv <- array(0, c(k, m , l) )
+
+#insert each velocity component as a slice of array
+adpv[,,1] <- u
+adpv[,,2] <- v
+adpv[,,3] <- w
+adpv[,,4] <- error
+
+
+#insert other variables into arrays ready for adp object
+#inserting echo intensity (a), most odfs only contain echo intensity data from first beam
+adpa <- array(NA, c(k, m, l))
+adpa[,,1] <- a
+
+#inserting percent good data, again odfs typically only contain the first beam of data
+adpg <- array(NA, c(k, m, l))
+adpg[,,1] <- unknown
+
+#inserting time variable
+adptime <- matrix(NA, c(k, 1))
+adptime <- time
+
+#inserting distance variable (represented by mean depth of each bin
+adpdistance <- matrix(NA, c(m, 1))
+adpdistance <- depthMean
+
+
+#create adp object
+
+adp <- as.adp(adptime, adpdistance, adpv, a = adpa, q = NULL, orientation = 'upward', coordinate = "enu")
+
+#test adp object by plotting
+
+plot(adp)
+
+#insert metadata from odf
+adp <- oceSetMetadata(adp, 'countryInstituteCode', countryInstituteCode)
+adp <- oceSetMetadata(adp, 'cruise', cruise)
+adp <- oceSetMetadata(adp, 'cruiseNumber', cruiseNumber)
+adp <- oceSetMetadata(adp, ' dataNamesOriginal', dataNamesOriginal)
+adp <- oceSetMetadata(adp, 'date', date)
+adp <- oceSetMetadata(adp, 'eventNumber', eventNumber)
+adp <- oceSetMetadata(adp, 'eventQualifier', eventQualifier)
+adp <- oceSetMetadata(adp, 'institute', institute)
+adp <- oceSetMetadata(adp, 'latitude', lat)
+adp <- oceSetMetadata(adp, 'longitude', lon)
+adp <- oceSetMetadata(adp, 'model', model)
+adp <- oceSetMetadata(adp, 'sampleInterval', sampleInterval)
+adp <- oceSetMetadata(adp, 'scientist', scientist)
+adp <- oceSetMetadata(adp, 'serialNumber', serialNumber)
+adp <- oceSetMetadata(adp, 'ship', ship)
+adp <- oceSetMetadata(adp, 'sounding', sounding)
+adp <- oceSetMetadata(adp, 'startTime', startTime)
+adp <- oceSetMetadata(adp, ' station', station)
+adp <- oceSetMetadata(adp, 'type', type)
+adp <- oceSetMetadata(adp, 'waterDepth', waterDepth)
+adp <- oceSetMetadata(adp, 'units', units)
+

@@ -2,8 +2,9 @@
 
 # lay out path and file name
 
-ncpath <- "/Users/ChisholmE/Desktop/"
-ncname <- "ADP_test01"
+ncpath <- "./"
+file.remove('ADP_test.nc')
+ncname <- "ADP_test"
 ncfname <- paste(ncpath, ncname, ".nc", sep = "")
 
 #define dimensions of data
@@ -65,26 +66,27 @@ ncout <- nc_create(ncfname, list(u_def, v_def, w_def, e_def, t_def, b1_def, b2_d
 
 #insert variables
 
-ncvar_put(ncout, u_def, EWCT)
-ncvar_put(ncout, v_def, NSCT)
-ncvar_put(ncout, w_def, VCSP)
-ncvar_put(ncout, e_def, ERRV)
-ncvar_put(ncout, t_def, t)
-ncvar_put(ncout, b1_def, BEAM_01)
-ncvar_put(ncout, b2_def, BEAM_02)
-ncvar_put(ncout, b3_def, BEAM_03)
-ncvar_put(ncout, b4_def, BEAM_04)
-ncvar_put(ncout, pg1_def, PG1)
-ncvar_put(ncout, pg2_def, PG2)
-ncvar_put(ncout, pg3_def, PG3)
-ncvar_put(ncout, pg4_def, PG4)
+
+ncvar_put(ncout, u_def, adp[['v']][,,1])
+ncvar_put(ncout, v_def, adp[['v']][,,2])
+ncvar_put(ncout, w_def, adp[['v']][,,3])
+ncvar_put(ncout, e_def, adp[['v']][,,4])
+ncvar_put(ncout, t_def, adp[['time']])
+ncvar_put(ncout, b1_def, adp[['a', 'numeric']][,,1])
+ncvar_put(ncout, b2_def, adp[['a', 'numeric']][,,2])
+ncvar_put(ncout, b3_def, adp[['a', 'numeric']][,,3])
+ncvar_put(ncout, b4_def, adp[['a', 'numeric']][,,4])
+ncvar_put(ncout, pg1_def, adp[['g', 'numeric']][,,1])
+ncvar_put(ncout, pg2_def, adp[['g', 'numeric']][,,2])
+ncvar_put(ncout, pg3_def, adp[['g', 'numeric']][,,3])
+ncvar_put(ncout, pg4_def, adp[['g', 'numeric']][,,4])
 
 #insert global attributes
 
 ncatt_put(ncout, 0, "title", "ADCP TEST")
 ncatt_put(ncout, 0, 'latitude', lat)
 ncatt_put(ncout, 0, 'longitude', lon)
-ncatt_put(ncout, 0, 'Distance_to_bin_1', distanceToBin1)
+ncatt_put(ncout, 0, 'Distance_to_bin_1', adp[['distanceToBin1']])
 ncatt_put(ncout, 0, "Mean Depth", meanDepth_trimmed)
 
 #summary and close
