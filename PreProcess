@@ -116,7 +116,8 @@ bin1Depth <- distanceToBin1 - transducerDepth
       # set maximum error velocity
       higherrv <- abs(ERRV) > 0.46 
       
-      #find maximum range of acceptable data, equation from RDI Primer for ADCP data      
+      #find maximum range of acceptable data, equation from RDI Primer for ADCP data
+      #STILL HAVING ISSUES WITH THIS FLAG
       rmax <- d *cos(adp[['beamAngle']])
       
 
@@ -124,7 +125,7 @@ bin1Depth <- distanceToBin1 - transducerDepth
        dim <- dim(v)
        flag <- array(FALSE, dim= dim)
        for (i in 1:4)
-          flag[,,i] <- (lowpg<25) | (ERRV > 0.46) | (d > rmax)
+          flag[,,i] <- (lowpg<25) | (ERRV > 0.46) | (d > rmax)| (d < 0 )
 
     #insert  flag into adp object
       adp@metadata$flags[["FFFF"]] <- flag
@@ -150,8 +151,10 @@ endTime <- max(adp[['time']])
   #averaging start and end declinations
   mAvg <- round(mean(c(mStart$declination, mEnd$declination)), digits = 2)
 
-  #applying declination to velocty data
- toEnu(adp, declination = 'mAvg')
+  #applying declination to velocity data
+adp <- oceSetMetadata(adp, 'oceCoordinate', 'xyz')
+adp <- xyzToEnu(adp, declination = mAvg)
+
 
 #Method 2
 #
