@@ -157,7 +157,7 @@ ncatt_put(ncout, 0, "project", "")
 ncatt_put(ncout, 0, "processing_level", "")
 ncatt_put(ncout, 0, "metadata_link", "")
 ncatt_put(ncout, 0, "references", "")
-ncatt_put(ncout, 0, "keywords_vocabulary", "")
+ncatt_put(ncout, 0, "keywords_vocabulary", "")            #https://wiki.earthdata.nasa.gov/display/CMR/GCMD+Keyword+Access
 ncatt_put(ncout, 0, "keywords", "")
 ncatt_put(ncout, 0, "acknowledgement", "")
 ncatt_put(ncout, 0, "comment", "")
