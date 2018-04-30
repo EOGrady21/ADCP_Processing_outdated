@@ -67,8 +67,8 @@ d <- swDepth(pressure, latitude = lat, eos = getOption("oceEOS", default = "gsw"
 plot(subset(d, d >0))
 
 #trim depth data
-depth <- subset(d, d>0)
-adp[['depth']] <- depth
+depth <- subset(d, d>10)      #subsetting data to include only depths below 10m, avoiding data collected while mooring was in transit
+adp[['v']][d< 10 ] <- NA        #setting velocity data above 10m to NA
 
 #average depth data
 meanDepth_oce <- adp[['depthMean']] #calculated by oce / instrument
@@ -97,79 +97,41 @@ distanceToBin1 <- adp[['bin1Distance']]
 #bin 1 distance - transducer depth
 bin1Depth <- distanceToBin1 - transducerDepth
 
-####Create flags for data outside bounds ####update to include all flags in one array
+####Create flags for data outside bounds
 #threshold based on BIO standards, 
-#flag_1: minimum percent good, flag <- PG1 +PG4 < 25 
-#flag_2: maximum error velocity, flag <- ERRV > 0.46 m/sec
-#flag_3 : to prevent surface contamination, flag <- distance > (meandepth - 10), 
+#flag (FFFF) : minimum percent good, flag <- PG1 +PG4 < 25 |
+#maximum error velocity, flag <- ERRV > 0.46 m/sec | 
+# surface contamination, flag <- depth > rmax (D*cos(beamAngle)) [ source :RDI primer for ADCP data]
 
-#flag_1
+
     #read in pg per beam
       g <- adp[['g', "numeric"]]
 
     #combine beam 1 and 4
       lowpg <- g[,,1]+g[,,4]
+      
+      #extract error velocities
+      ERRV <- adp[['v']][,,4]
+      
+      # set maximum error velocity
+      higherrv <- abs(ERRV) > 0.46 
+      
+      #find maximum range of acceptable data, equation from RDI Primer for ADCP data
+      #STILL HAVING ISSUES WITH THIS FLAG
+      rmax <- d *cos(adp[['beamAngle']])
+      
 
     #create flag array
        dim <- dim(v)
-       flag_1 <- array(FALSE, dim= dim)
+       flag <- array(FALSE, dim= dim)
        for (i in 1:4)
-          flag_1[,,i] <- lowpg<25
+          flag[,,i] <- (lowpg<25) | (ERRV > 0.46) | (d > rmax)| (d < 0 )
 
     #insert  flag into adp object
-      adp@metadata$flags[["1"]] <- flag_1
-
-#flag_2
-    #extract error velocities
-        ERRV <- adp[['v']][,,4]
-
-    # set maximum error velocity
-        higherrv <- abs(ERRV) > 0.46 
-
-    #create flag matrix of data points exceeding maximum error
-    #create flag array
-        dim <- dim(v)
-        flag_2 <- array(FALSE, dim= dim)
-        for (i in 1:4)
-          flag_2[,,i] <- (ERRV > 0.46)
-
-    #insert  flag into adp object
-        adp@metadata$flags[["2"]] <- flag_2
-
-
-#flag_3
-    #extract distance from adp object
-        dist <- adp[['distance', 'numeric']]
-
-    #create flag matrix of data above surface
-        dim <- dim(v)
-        flag_3 <- array(FALSE, dim= dim)
-        for (i in 1:4)
-            flag_3[,,i] <- dist > (meanDepth_trimmed - 10)
-
-    #insert flag into ADP object
-        adp@metadata$flags[["3"]] <- flag_3
+      adp@metadata$flags[["FFFF"]] <- flag
 
 
 
-####Eliminate data above surface contamination####
-     #upward facing ADCPs ping off the surface which creates anomolies and spikes in the data 
-     #data is cut off at discretion of researcher, typically using mean depth to calculate distance to surface
-     
-distance <- adp[['distance', 'numeric']]
-
-distance <- subset(distance, distance < meanDepth_trimmed - 10)            #bins within 10 m of surface are typically thrown away (Roger)
-str(distance)                                                #check dimensions
-
-
-#null data above surface using inverse of dimensions from 'distance'
-          #for example, sample data has 40 bins, str(distance) returns a 1:24 matrix,
-          # this means there are 24 bins below the meanDepth which are not contaminated by surface (in theory)
-          # to remove the bins above the surface you would remove bins 25:40
-          
-adp[['v']][,25:40,] <- NA
-
-  
 
 ####Correction for magnetic variation over time series###
    #magnetic declination is calculated and applied to data series
@@ -189,8 +151,10 @@ endTime <- max(adp[['time']])
   #averaging start and end declinations
   mAvg <- round(mean(c(mStart$declination, mEnd$declination)), digits = 2)
 
-  #applying declination to velocty data
- toEnu(adp, declination = 'mAvg')
+  #applying declination to velocity data
+adp <- oceSetMetadata(adp, 'oceCoordinate', 'xyz')
+adp <- xyzToEnu(adp, declination = mAvg)
+
 
 #Method 2
 #
@@ -255,9 +219,8 @@ PG3 <- adp[['g', 'numeric']][,,3]
 PG4 <- adp[['g', 'numeric']][,,4]
 
 #flags on velocity values
-flag_1  #low percent good (PG1 +PG4 < 25)
-flag_2  #high error velocity (ERRV > 0.46 m/sec)
-flag_3  #greater than distance to surface
+flag
+#adp@metadata$flags$FFFF
 
 #onboard sensor data #correct variable names?
 TEMP <- adp[['temperature']]  #temperature

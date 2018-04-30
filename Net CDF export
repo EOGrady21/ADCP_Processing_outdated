@@ -20,45 +20,44 @@ fillvalue <- 1e35
 
 #define variable names
 
-dlname <- "Eastward velocity"
+dlname <- "eastward_sea_water_velocity"
 u_def <- ncvar_def("EWCT", "m/sec", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
 
-dlname <- "Northward Velocity"
+dlname <- "northward_sea_water_velocity"
 v_def <- ncvar_def("NSCT", "m/sec", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
 
-dlname <- "Vertical Velocity"
+dlname <- "vertical_sea_watervvelocity"
 w_def <- ncvar_def("VSCP", "m/sec", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
 
 dlname <- "time_02"
-t_def <- ncvar_def("t", "POSIXct", list(depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+t_def <- ncvar_def("SYTM", "POSIXct", list(timedim, londim, latdim), fillvalue, dlname, prec = "float")
 
-dlname <- "Error Velocity"
+dlname <- "error_velocity_in_sea_water"
 e_def <- ncvar_def("ERRV", "m/sec", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
 
-dlname <- "Beam_01"
+dlname <- "ADCP_echo_intensity_beam_1"
 b1_def <- ncvar_def("BEAM_01", "a", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
 
-dlname <- "BEAM_02"
+dlname <- "ADCP_echo_intensity_beam_2"
 b2_def <- ncvar_def("BEAM_02", "a", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
 
-dlname <- "BEAM_03"
+dlname <- "ADCP_echo_intensity_beam_3"
 b3_def <- ncvar_def("BEAM_03", "a", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
 
-dlname <- "BEAM_04"
+dlname <- "ADCP_echo_intensity_beam_4"
 b4_def <- ncvar_def("BEAM_04", "a", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
 
-dlname <- "PG_1"
-pg1_def <- ncvar_def("PG1", "counts", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+dlname <- "percent_good_beam_1"
+pg1_def <- ncvar_def("UNKN_01", "counts", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
 
-dlname <- "PG_2"
-pg2_def <- ncvar_def("PG2", "counts", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+dlname <- "percent_good_beam_2"
+pg2_def <- ncvar_def("UNKN_02", "counts", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
 
-dlname <- "PG3"
-pg3_def <- ncvar_def("PG3", "counts", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+dlname <- "percent_good_beam_3"
+pg3_def <- ncvar_def("UNKN_03", "counts", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
 
-dlname <- "PG4"
-pg4_def <- ncvar_def("PG4", "counts", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
-
+dlname <- "percent_good_beam_4"
+pg4_def <- ncvar_def("UNKN_04", "counts", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
 
 #create NC file
 
@@ -83,11 +82,150 @@ ncvar_put(ncout, pg4_def, adp[['g', 'numeric']][,,4])
 
 #insert global attributes
 
-ncatt_put(ncout, 0, "title", "ADCP TEST")
-ncatt_put(ncout, 0, 'latitude', lat)
-ncatt_put(ncout, 0, 'longitude', lon)
-ncatt_put(ncout, 0, 'Distance_to_bin_1', adp[['distanceToBin1']])
-ncatt_put(ncout, 0, "Mean Depth", meanDepth_trimmed)
+#BIO header requirements
+ncatt_put(ncout, 0, "organization", "BIO")
+ncatt_put(ncout, 0, "cruise_name", "")
+ncatt_put(ncout, 0, "cruise_description", "")
+ncatt_put(ncout, 0, "inst_type", "ADCP")
+ncatt_put(ncout, 0, "country_institute_code", "")
+ncatt_put(ncout, 0, "cruise_number", "")
+ncatt_put(ncout, 0, "chief_scientist", "")
+ncatt_put(ncout, 0, "start_date", "")
+ncatt_put(ncout, 0, "end_date", "")
+ncatt_put(ncout, 0, "platform", "")
+ncatt_put(ncout, 0, "data_type", "")
+ncatt_put(ncout, 0, "event_number", "")
+ncatt_put(ncout, 0, "event_qualifier", "")
+ncatt_put(ncout, 0, "creation_date", "")
+ncatt_put(ncout, 0, "orig_creation_date", "")
+ncatt_put(ncout, 0, "start_date_time", "")
+ncatt_put(ncout, 0, "start_date_time", "")
+ncatt_put(ncout, 0, "initial_latitude", "")
+ncatt_put(ncout, 0, "initial_longitude", "")
+ncatt_put(ncout, 0, "min_depth", "")
+ncatt_put(ncout, 0, "max_depth", "")
+ncatt_put(ncout, 0, "sampling_interval", "")
+ncatt_put(ncout, 0, "sounding", "")
+ncatt_put(ncout, 0, "depth_off_bottom", "")
+ncatt_put(ncout, 0, "event_comments", "")
+ncatt_put(ncout, 0, "model", "")
+ncatt_put(ncout, 0, "serial_number", "")
+ncatt_put(ncout, 0, "description", "")
+ncatt_put(ncout, 0, "system_upload_time", "")
+
+#CF convention attributes from template
+#https://www.nodc.noaa.gov/data/formats/netcdf/v2.0/
+ncatt_put(ncout, 0, "instrument", "")
+ncatt_put(ncout, 0, "platform", "")
+ncatt_put(ncout, 0, "title", "")
+ncatt_put(ncout, 0, "conventions", "")
+ncatt_put(ncout, 0, "naming_authority", "")
+ncatt_put(ncout, 0, "geospatial_bounds", "")
+ncatt_put(ncout, 0, "geospatial_bounds_crs", "")
+ncatt_put(ncout, 0, "geospatial_bounds_vertical_crs", "")
+ncatt_put(ncout, 0, "creator_type", "person")
+ncatt_put(ncout, 0, "creator_institution", "")
+ncatt_put(ncout, 0, "publisher_type", "")
+ncatt_put(ncout, 0, "publisher_institution", "")
+ncatt_put(ncout, 0, "program", "")     # eg AZMP monitoring project
+ncatt_put(ncout, 0, "date_metadata_modified", "")
+ncatt_put(ncout, 0, "instrument_vocabulary", "")
+ncatt_put(ncout, 0, "platform_vocabulary", "")
+ncatt_put(ncout, 0, "source", "")      # eg Python script
+ncatt_put(ncout, 0, "featureType", "")    #eg. Time series
+ncatt_put(ncout, 0, "cdm_data_type", "")     # eg station
+ncatt_put(ncout, 0, "standard_name_vocabulary", "")    #eg CF standard name table v30
+ncatt_put(ncout, 0, "uuid", "")
+ncatt_put(ncout, 0, "sea_name", "")
+ncatt_put(ncout, 0, "time_coverage_start", "")
+ncatt_put(ncout, 0, "time_coverage_end", "")
+ncatt_put(ncout, 0, "time_coverage_resolution", "")
+ncatt_put(ncout, 0, "geospatial_lat_min", "")
+ncatt_put(ncout, 0, "geospatial_lat_max", "")
+ncatt_put(ncout, 0, "geospatial_lon_min", "")
+ncatt_put(ncout, 0, "geosptial_lon_max", "")
+ncatt_put(ncout, 0, "geosptial_lon_units", "")
+ncatt_put(ncout, 0, "geospatial_vertical_min", "")
+ncatt_put(ncout, 0, "geosptial_vertical_max", "")
+ncatt_put(ncout, 0, "geosptial_vertical_units", "")
+ncatt_put(ncout, 0, "geosptial_vertical_positive", "")     #eg up or down
+ncatt_put(ncout, 0, "institution", "")
+ncatt_put(ncout, 0, "creator_name", "")
+ncatt_put(ncout, 0, "creator_url", "")
+ncatt_put(ncout, 0, "creator_email", "")
+ncatt_put(ncout, 0, "project", "")
+ncatt_put(ncout, 0, "processing_level", "")
+ncatt_put(ncout, 0, "metadata_link", "")
+ncatt_put(ncout, 0, "references", "")
+ncatt_put(ncout, 0, "keywords_vocabulary", "")
+ncatt_put(ncout, 0, "keywords", "")
+ncatt_put(ncout, 0, "acknowledgement", "")
+ncatt_put(ncout, 0, "comment", "")
+ncatt_put(ncout, 0, "contributor_name", "")
+ncatt_put(ncout, 0, "contributor_role", "")
+ncatt_put(ncout, 0, "date_created", "")
+ncatt_put(ncout, 0, "date_modified", "")
+ncatt_put(ncout, 0, "date_issued", "")
+ncatt_put(ncout, 0, "publisher_name", "")
+ncatt_put(ncout, 0, "publisher_email", "")
+ncatt_put(ncout, 0, "publisher_url", "")
+ncatt_put(ncout, 0, "license", "")
+ncatt_put(ncout, 0, "time_coverage_duration", "")
+ncatt_put(ncout, 0, "history", "")
+ncatt_put(ncout,0, "_Fillvalue", "1e32")
+ncatt_put(ncout, 0, "cell_measures", "")
+ncatt_put(ncout, 0 , "cell_methods", "")
+ncatt_put(ncout, 0 , "coordinates", "")
+ncatt_put(ncout, 0 , "flag_meanings", "")
+ncatt_put(ncout, 0 , "flag_values", "")
+
+
+
+#BODC P01 names
+#https://www.bodc.ac.uk/resources/vocabularies/vocabulary_search/P01/
+ncatt_put(ncout, "EWCT", "P01_name", "LCEWAP01")
+ncatt_put(ncout, "NSCT", "P01_name", "LCDAAP01")
+ncatt_put(ncout, "VCSP", "P01_name", "LRZAAP01")
+ncatt_put(ncout, "ERRV", "P01_name", "LERRAP01")
+ncatt_put(ncout, "BEAM_01", "P01_name", "TNIHCE01")
+ncatt_put(ncout, "BEAM_02", "P01_name", "TNIHCE02")
+ncatt_put(ncout, "BEAM_03", "P01_name", "TNIHCE03")
+ncatt_put(ncout, "BEAM_04", "P01_name", "TNIHCE04")
+
+#CF standard names 
+#http://cfconventions.org/Data/cf-conventions/cf-conventions-1.6/build/cf-conventions.html#idp4625472
+ncatt_put(ncout, "EWCT", "standard_name", "eastward_sea_water_velocity")
+ncatt_put(ncout, "NSCT", "standard_name", "northward_sea_water_velocity")
+ncatt_put(ncout, "VCSP", "standard_name", "upward_sea_water_velocity")
+ncatt_put(ncout, "ERRV", "standard_name", "")
+ncatt_put(ncout, "BEAM_01", "standard_name", "")
+ncatt_put(ncout, "BEAM_02", "standard_name", "")
+ncatt_put(ncout, "BEAM_03", "standard_name", "")
+ncatt_put(ncout, "BEAM_04", "standard_name", "")
+ncatt_put(ncout, "UNKN_01", "standard_name", "")
+ncatt_put(ncout, "UNKN_02", "standard_name", "")
+ncatt_put(ncout, "UNKN_03", "standard_name", "")
+ncatt_put(ncout, "UNKN_04", "standard_name", "")
+ncatt_put(ncout, "lat", "standard_name", "latitude")
+ncatt_put(ncout, "lon", "standard_name", "longitude")
+ncatt_put(ncout, "dist", "poitive", "down")     #direction of depth axis
+ncatt_put(ncout, "dist", "axis", "y")
+ncatt_put(ncout, "time", "axis", "x")
+ncatt_put(ncout, "EWCT", "valid_max", "")    #use min/ max or range
+ncatt_put(ncout, "EWCT", "valid_min", "")
+ncatt_put(ncout, "EWCT", "valid_range", "")
+ncatt_put(ncout, "NSCT", "valid_range", "")
+ncatt_put(ncout, "VCSP", "valid_range", "")
+ncatt_put(ncout, "ERRV", "valid_max", "")      # eg 0.46 m/sec max error v
+ncatt_put(ncout, "BEAM_01", "valid_min", "")  
+ncatt_put(ncout, "BEAM_02", "valid_min", "")
+ncatt_put(ncout, "BEAM_03", "valid_min", "")
+ncatt_put(ncout, "BEAM_04", "valid_min", "")
+ncatt_put(ncout, "UNKN_01", "valid_min", "")      # eg min 25 % good
+ncatt_put(ncout, "UNKN_02", "valid_min", "")
+ncatt_put(ncout, "UNKN_03", "valid_min", "")
+ncatt_put(ncout, "UNKN_04", "valid_min", "")
+
 
 #summary and close
 ncout
