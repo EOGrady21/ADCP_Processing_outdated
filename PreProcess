@@ -13,6 +13,88 @@ v <- adp[['v']]
 pressure <- adp[['pressure']]
 lat <- adp[['latitude']] 
 lon <- adp[['longitude']]
+depth <- adp[['depth']]
+
+####Create flags for data outside bounds
+#threshold based on BIO standards, 
+#flag (FFFF) :
+#minimum percent good, flag <- PG1 +PG4 < 25 |
+#maximum error velocity, flag <- ERRV > 0.46 m/sec | 
+#surface contamination, flag <- depth > rmax, where rmax =  (D*cos(beamAngle)) 
+
+# minimum percent good 
+# beams 1 + 4 > 25, represents percent good of 3 beam solutions plus 4 beam solutions
+# source: BIO scientists (documentation:)
+#threshold of error velocities
+# flag any data with error velocities higher than 1.5 ft/sec or 0.46 m/sec 
+#subject to change depending on a variety of factors including instrument frequency, water mode, etc
+#source: USGS, documentation: https://water.usgs.gov/admin/memo/SW/OSW.2002.03.htm
+#surface contamination
+#maximum acceptable data range avoiding surface contamination is based
+#on the beam angle of intsrument and depth of deployment
+#[ source :RDI primer for ADCP data]
+
+
+#depth threshold
+
+#beam angle translated to radians
+deg2rad <- function(deg) {(deg * pi) / (180)}
+beamAngle <- deg2rad(adp[['beamAngle']])
+
+
+#RDI primer equation for maximum acceptable data range
+rmax <- depth *(cos(beamAngle))
+
+#create an array of maximum data range
+dim = dim(v)
+rarray <- array(FALSE, dim = dim)
+
+for (j in 1:50 ){
+  for( k in 1:4) {
+    rarray[,j,k] <- rmax
+  }
+}
+
+#create an array of distance (adp to surface)
+dist <- adp[['distance']]
+darray <- array(FALSE, dim = dim)
+
+for (i in 1:22190){
+  for( k in 1:4){
+    darray[i,,k] <- dist
+  }
+}
+
+
+#read in pg per beam
+g <- adp[['g', "numeric"]]
+
+#combine beam 1 and 4
+lowpg <- g[,,1]+g[,,4]
+
+#extract error velocities
+ERRV <- adp[['v']][,,4]
+
+#create array of low percent good and high error velocities
+#(using absolute value of erro velocity)
+v2flag <- array(FALSE, dim= dim)
+for (i in 1:4)
+  v2flag[,,i] <- (lowpg<25) | (abs(ERRV) > 0.46) 
+
+#create array which flags distance values larger than maximum data range OR 
+#values flagged due to low percent good OR
+#values flagged due to high error velocity
+
+
+FFFF<- array(FALSE, dim = dim)
+FFFF <- rarray < darray | v2flag[TRUE]
+
+
+#insert flag array into adp object
+adp[['vFlag']] <- FFFF
+#converts flagged values to NA in velocity components(see ?handleFlags,adp-method in oce documentation)
+adp <- handleFlags(adp)
+plot(adp, which = 1)
 
 ####trim time when transducer was out of water (pre and post deployment)
 #plot start of time series
@@ -51,24 +133,18 @@ plot(subset(adp, time < mean(range(adp[['time']]))-10e6), which = 1)
 plot(subset(adp, time > mean(range(adp[['time']]))+10e6), which = 1)
 
 
-#### microcat pressure to depth####
+#### pressure to depth####
   # pressure data from ADCP is converted into depth of seawater using swDepth function,
   # depth data can also be acessed by oce package directly, although this data is not corrected for specific temperature and pressure. 
-  # pre and post deployment data is removed based on depth < 0 (above water surface).
   #Depth is plotted over time series to check for drift or bad data from movement of mooring or transducer
   # Depth is averaged over entire deployment.
   
-d <- adp[['depth']]
 
 #using swDepth
 d <- swDepth(pressure, latitude = lat, eos = getOption("oceEOS", default = "gsw"))
 
 #plot subset, visually check for drift
-plot(subset(d, d >0))
-
-#trim depth data
-depth <- subset(d, d>10)      #subsetting data to include only depths below 10m, avoiding data collected while mooring was in transit
-adp[['v']][d< 10 ] <- NA        #setting velocity data above 10m to NA
+plot(subset(depth, depth >0))
 
 #average depth data
 meanDepth_oce <- adp[['depthMean']] #calculated by oce / instrument
@@ -96,41 +172,6 @@ distanceToBin1 <- adp[['bin1Distance']]
 
 #bin 1 distance - transducer depth
 bin1Depth <- distanceToBin1 - transducerDepth
-
-####Create flags for data outside bounds
-#threshold based on BIO standards, 
-#flag (FFFF) : minimum percent good, flag <- PG1 +PG4 < 25 |
-#maximum error velocity, flag <- ERRV > 0.46 m/sec | 
-# surface contamination, flag <- depth > rmax (D*cos(beamAngle)) [ source :RDI primer for ADCP data]
-
-
-    #read in pg per beam
-      g <- adp[['g', "numeric"]]
-
-    #combine beam 1 and 4
-      lowpg <- g[,,1]+g[,,4]
-      
-      #extract error velocities
-      ERRV <- adp[['v']][,,4]
-      
-      # set maximum error velocity
-      higherrv <- abs(ERRV) > 0.46 
-      
-      #find maximum range of acceptable data, equation from RDI Primer for ADCP data
-      #STILL HAVING ISSUES WITH THIS FLAG
-      rmax <- d *cos(adp[['beamAngle']])
-      
-
-    #create flag array
-       dim <- dim(v)
-       flag <- array(FALSE, dim= dim)
-       for (i in 1:4)
-          flag[,,i] <- (lowpg<25) | (ERRV > 0.46) | (d > rmax)| (d < 0 )
-
-    #insert  flag into adp object
-      adp@metadata$flags[["FFFF"]] <- flag
-
-
 
 
 ####Correction for magnetic variation over time series###
@@ -161,47 +202,6 @@ adp <- xyzToEnu(adp, declination = mAvg)
 #
 #
 #
-
-
-####Thresholding data to prevent spikes or bad data with interference####
-  #thresholding is done by setting minimum percent good on data
-       # minimum of 25 % good on beams 1 and 4 combined, represents percent good of 3 beam solutions plus 4 beam solutions
-       # source: BIO scientists (documentation:)
-  #threshold of error velocities
-        # null/ flag any data with error velocities higher than 1.5 ft/sec or 0.46 m/sec depending on a variety of factors
-        #source: USGS, documentation: https://water.usgs.gov/admin/memo/SW/OSW.2002.03.htm
-
-#plot percent good pings
-plot(adp, which = c(70:73), decimate = FALSE)
-
-#read in percent good as integer (out of raw format)
-g <- adp[['g', "numeric"]]
-
-#combine beam 1 and 4
-lowpg <- g[,,1]+g[,,4]
-
-
-#null (NA) velocity  values below PG1 + PG4 = 25
-adp[['v']][lowpg < 25] <- NA
-
-
-#visually check how much data has been nulled
-plot(adp, which = 1)
-plot(adp_raw, which = 1)
-
-
-#null error velocities >1.5 ft/sec or 0.46 m/sec source:https://water.usgs.gov/admin/memo/SW/OSW.2002.03.htm
-
-
-ERRV <- adp[['v']][,,4]
-higherrv <- abs(ERRV) > 0.46 
-
-#null (NA) velocity values with error velocity >0.46 m/sec
-adp[['v']][higherrv] <- NA  
-
-#visually check how much data has been nulled
-plot(adp, which = 4)
-plot(adp_raw, which = 4)
 
 
 
