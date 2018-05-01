@@ -7,64 +7,76 @@ file.remove('ADP_test.nc')
 ncname <- "ADP_test"
 ncfname <- paste(ncpath, ncname, ".nc", sep = "")
 
-#define dimensions of data
+#dimension variables from adp object
+time <- adp[['time']]
+dist <- adp[['distance', 'numeric']]
+lon <- adp[['longitude']]
+lat <- adp[['latitude']]
 
-timedim <- ncdim_def("time", "POSIXct", as.double(time))
-depthdim <- ncdim_def("distance", "m", as.double(distance))
-londim <- ncdim_def("lon", "degrees_east", as.double(lon))
+
+timedim <- ncdim_def("time", "julian", as.double(time))
+depthdim <- ncdim_def("depth", "m", as.double(dist))
+londim <- ncdim_def("lon", "degrees_east" , as.double(lon))
 latdim <- ncdim_def("lat", "degrees_north", as.double(lat))
 
-#define fill value
+_FillValue <- 1e35
 
-fillvalue <- 1e35
-
-#define variable names
 
 dlname <- "eastward_sea_water_velocity"
-u_def <- ncvar_def("EWCT", "m/sec", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+u_def <- ncvar_def("EWCT", "m/sec", list(timedim, depthdim, londim, latdim), _FillValue, dlname, prec = "float")
 
 dlname <- "northward_sea_water_velocity"
-v_def <- ncvar_def("NSCT", "m/sec", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+v_def <- ncvar_def("NSCT", "m/sec", list(timedim, depthdim, londim, latdim), _FillValue, dlname, prec = "float")
 
-dlname <- "vertical_sea_watervvelocity"
-w_def <- ncvar_def("VSCP", "m/sec", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+dlname <- "upward_sea_water_velocity"
+w_def <- ncvar_def("VSCP", "m/sec", list(timedim, depthdim, londim, latdim), _FillValue, dlname, prec = "float")
 
 dlname <- "time_02"
-t_def <- ncvar_def("SYTM", "POSIXct", list(timedim, londim, latdim), fillvalue, dlname, prec = "float")
+t_def <- ncvar_def("SYTM", "POSIXct", list(timedim, londim, latdim), _FillValue, dlname, prec = "float")
 
 dlname <- "error_velocity_in_sea_water"
-e_def <- ncvar_def("ERRV", "m/sec", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+e_def <- ncvar_def("ERRV", "m/sec", list(timedim, depthdim, londim, latdim), _FillValue, dlname, prec = "float")
 
 dlname <- "ADCP_echo_intensity_beam_1"
-b1_def <- ncvar_def("BEAM_01", "a", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+b1_def <- ncvar_def("BEAM_01", "a", list(timedim, depthdim, londim, latdim), _FillValue, dlname, prec = "float")
 
 dlname <- "ADCP_echo_intensity_beam_2"
-b2_def <- ncvar_def("BEAM_02", "a", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+b2_def <- ncvar_def("BEAM_02", "a", list(timedim, depthdim, londim, latdim), _FillValue, dlname, prec = "float")
 
 dlname <- "ADCP_echo_intensity_beam_3"
-b3_def <- ncvar_def("BEAM_03", "a", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+b3_def <- ncvar_def("BEAM_03", "a", list(timedim, depthdim, londim, latdim), _FillValue, dlname, prec = "float")
 
 dlname <- "ADCP_echo_intensity_beam_4"
-b4_def <- ncvar_def("BEAM_04", "a", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+b4_def <- ncvar_def("BEAM_04", "a", list(timedim, depthdim, londim, latdim), _FillValue, dlname, prec = "float")
 
 dlname <- "percent_good_beam_1"
-pg1_def <- ncvar_def("UNKN_01", "counts", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+pg1_def <- ncvar_def("UNKN_01", "counts", list(timedim, depthdim, londim, latdim), _FillValue, dlname, prec = "float")
 
 dlname <- "percent_good_beam_2"
-pg2_def <- ncvar_def("UNKN_02", "counts", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+pg2_def <- ncvar_def("UNKN_02", "counts", list(timedim, depthdim, londim, latdim), _FillValue, dlname, prec = "float")
 
 dlname <- "percent_good_beam_3"
-pg3_def <- ncvar_def("UNKN_03", "counts", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+pg3_def <- ncvar_def("UNKN_03", "counts", list(timedim, depthdim, londim, latdim), _FillValue, dlname, prec = "float")
 
 dlname <- "percent_good_beam_4"
-pg4_def <- ncvar_def("UNKN_04", "counts", list(timedim, depthdim, londim, latdim), fillvalue, dlname, prec = "float")
+pg4_def <- ncvar_def("UNKN_04", "counts", list(timedim, depthdim, londim, latdim), _FillValue, dlname, prec = "float")
 
-#create NC file
+dlname <- "pitch"
+p_def <- ncvar_def("PITCH", "degrees", list(timedim, londim, latdim), _FillValue, dlname, prec = "float")
 
-ncout <- nc_create(ncfname, list(u_def, v_def, w_def, e_def, t_def, b1_def, b2_def, b3_def, b4_def, pg1_def, pg2_def, pg3_def, pg4_def), force_v4 = TRUE)
+dlname <- "roll"
+r_def <- ncvar_def("ROLL", "degrees", list(timedim, londim, latdim), _FillValue, dlname, prec = "float")
 
-#insert variables
+dlname <- "height of sea surface"
+hght_def <- ncvar_def("hght", "m", list(timedim, londim, latdim), _FillValue, dlname, prec = "float")
 
+dlname <- "ADCP Transducer Temp."
+Tx_def <- ncvar_def("Tx", "degrees", list(timedim, londim, latdim), _FillValue, dlname, prec = "float")
+
+dlname <- "instrument depth"
+D_def <- ncvar_def("D", "m", list(timedim, londim, latdim), _FillValue, dlname, prec = "float")
+
+ncout <- nc_create(ncfname, list(u_def, v_def, w_def, e_def, t_def, b1_def, b2_def, b3_def, b4_def, pg1_def, pg2_def, pg3_def, pg4_def, p_def, r_def, hght_def, Tx_def, D_def), force_v4 = TRUE)
 
 ncvar_put(ncout, u_def, adp[['v']][,,1])
 ncvar_put(ncout, v_def, adp[['v']][,,2])
@@ -79,8 +91,11 @@ ncvar_put(ncout, pg1_def, adp[['g', 'numeric']][,,1])
 ncvar_put(ncout, pg2_def, adp[['g', 'numeric']][,,2])
 ncvar_put(ncout, pg3_def, adp[['g', 'numeric']][,,3])
 ncvar_put(ncout, pg4_def, adp[['g', 'numeric']][,,4])
-
-#insert global attributes
+ncvar_put(ncout, p_def, adp[['pitch']])
+ncvar_put(ncout, r_def, adp[['roll']])
+ncvar_put(ncout, hght_def, adp[['depth']])
+ncvar_put(ncout, Tx_def, adp[['temperature']])
+ncvar_put(ncout, D_def, adp[['depth']])
 
 #BIO header requirements
 ncatt_put(ncout, 0, "organization", "BIO")
@@ -113,8 +128,125 @@ ncatt_put(ncout, 0, "serial_number", "")
 ncatt_put(ncout, 0, "description", "")
 ncatt_put(ncout, 0, "system_upload_time", "")
 
+
+#BIO NCDF ATTRIBUTES
+#ncatt_put(ncout, 0, "CREATION_DATE", "") --> date_created
+ncatt_put(ncout, 0, "MOORING", "")
+ncatt_put(ncout, 0, "Deployment_date", "")
+ncatt_put(ncout, 0, "Recovery_date", "")
+ncatt_put(ncout, 0, "firmware_version", adp[['firmwareVersion']])
+ncatt_put(ncout, 0, "frequency", adp[['frequency']])
+ncatt_put(ncout, 0, "beam_pattern", adp[['beamPattern']])
+ncatt_put(ncout, 0, "janus", adp[['numberOfBeams']])
+ncatt_put(ncout, 0, "pings_per_ensemble", adp[['pingsPerEnsemble']])
+ncatt_put(ncout, 0, "pred_accuracy", "")
+ncatt_put(ncout, 0, "valid_correlation_range", adp[['lowCorrThresh']])
+ncatt_put(ncout, 0, "valid_correlation_range", "")
+ncatt_put(ncout, 0, "minmax_percent_good", adp[['percentGdMinimum']])
+ncatt_put(ncout, 0,"minmax_percent_good", "100")
+ncatt_put(ncout, 0, "error_velocity_threshold", adp[['errorVelocityMaximum']])
+ncatt_put(ncout, 0, "time_between_ping_groups", "")
+ncatt_put(ncout, 0, "transmit_pulse_length_cm", adp[['xmitPulseLength']])
+ncatt_put(ncout, 0, "starting_water_layer", "")
+ncatt_put(ncout, 0, "ending_water_layer", "")
+ncatt_put(ncout, 0, "false_target_reject_values", adp[['falseTargetThresh']])
+ncatt_put(ncout, 0, "false_target_reject_values", "")
+ncatt_put(ncout, 0, "ADCP_serial_number", adp[['serialNumber']])
+ncatt_put(ncout, 0, "depth_note", "")
+ncatt_put(ncout, 0, "transform", adp[['oceCoordinate']])
+ncatt_put(ncout, 0, "DATA_TYPE", adp[['instrumentType']])
+ncatt_put(ncout, 0, "DATA_SUBTYPE", "")
+ncatt_put(ncout, 0, "DATA_ORIGIN", "")
+ncatt_put(ncout, 0, "COORD_SYSTEM", adp[['oceCoordinate']])
+#ncatt_put(ncout, 0, "WATER_MASS", "") --> sea_name
+ncatt_put(ncout, 0, "POS_CONST", "")
+ncatt_put(ncout, 0, "DEPTH_CONST", "")
+ncatt_put(ncout, 0, "WATER_DEPTH", "")
+ncatt_put(ncout, 0, "DRIFTER", "")
+#ncatt_put(ncout, 0, "VAR_FILL", "") ---> _FillValue
+ncatt_put(ncout, 0, "EXPERIMENT", "")
+#ncatt_put(ncout, 0, "PROJECT", "") --> program
+#ncatt_put(ncout, 0, "DESCRIPT", "") --> comment
+ncatt_put(ncout, 0, "longitude", adp[['longitude']])
+ncatt_put(ncout, 0, "latitude", adp[['latitude']])
+#ncatt_put(ncout, 0, "FILL_FLAG", "") --> flag_values
+ncatt_put(ncout, 0, "COMPOSITIE", "")
+ncatt_put(ncout, 0, "VAR_DESC", "")
+ncatt_put(ncout, 0, "DELTA_T","")
+ncatt_put(ncout, 0, "start_time", "")
+ncatt_put(ncout, 0, "stop_time", "")
+ncatt_put(ncout, 0, "magnetic_variation", adp[['magneticVariation']])
+ncatt_put(ncout, 0, "platform", "")
+ncatt_put(ncout, 0, "sounding", "")
+ncatt_put(ncout, 0, "chief_scientist", "")
+ncatt_put(ncout, "depth", "blanking_dist", "")
+ncatt_put(ncout, "depth", "xducer_offset_from_bottom", adp[['transducerDepth']])
+ncatt_put(ncout, "depth", "bin_size", adp[['cellSize']])
+ncatt_put(ncout, "EWCT", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "EWCT", "sensor_depth", "")
+ncatt_put(ncout, "EWCT", "serial_number", "")
+ncatt_put(ncout, "NSCT", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "NSCT", "sensor_depth", "")
+ncatt_put(ncout, "NSCT", "serial_number", "")
+ncatt_put(ncout, "VSCP", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "VSCP", "sensor_depth", "")
+ncatt_put(ncout, "VSCP", "serial_number", "")
+ncatt_put(ncout, "ERRV", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "ERRV", "sensor_depth", "")
+ncatt_put(ncout, "ERRV", "serial_number", "")
+ncatt_put(ncout, "BEAM_01", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "BEAM_01", "sensor_depth", adp[['depthMean']])
+ncatt_put(ncout, "BEAM_01", "serial_number", adp[['serialNumber']])
+ncatt_put(ncout, "BEAM_02", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "BEAM_02", "sensor_depth", adp[['depthMean']])
+ncatt_put(ncout, "BEAM_02", "serial_number", adp[['serialNumber']])
+ncatt_put(ncout, "BEAM_03", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "BEAM_03", "sensor_depth", adp[['depthMean']])
+ncatt_put(ncout, "BEAM_03", "serial_number", adp[['serialNumber']])
+ncatt_put(ncout, "BEAM_04", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "BEAM_04", "sensor_depth", adp[['depthMean']])
+ncatt_put(ncout, "BEAM_04", "serial_number", adp[['serialNumber']])
+ncatt_put(ncout, "UNKN_01", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "UNKN_01", "sensor_depth", adp[['depthMean']])
+ncatt_put(ncout, "UNKN_01", "serial_number", adp[['serialNumber']])
+ncatt_put(ncout, "UNKN_02", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "UNKN_02", "sensor_depth", adp[['depthMean']])
+ncatt_put(ncout, "UNKN_02", "serial_number", adp[['serialNumber']])
+ncatt_put(ncout, "UNKN_03", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "UNKN_03", "sensor_depth", adp[['depthMean']])
+ncatt_put(ncout, "UNKN_03", "serial_number", adp[['serialNumber']])
+ncatt_put(ncout, "UNKN_04", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "UNKN_04", "sensor_depth", adp[['depthMean']])
+ncatt_put(ncout, "UNKN_04", "serial_number", adp[['serialNumber']])
+ncatt_put(ncout, "EWCT", "generic_name", "u")
+ncatt_put(ncout, "NSCT", "generic_name", "v")
+ncatt_put(ncout, "VSCP", "generic_name", "w")
+ncatt_put(ncout, "ERRV", "generic_name", "w")       #issue in current NC protocol
+ncatt_put(ncout, "BEAM_01", "generic_name", "AGC")
+ncatt_put(ncout, "BEAM_02", "generic_name", "AGC")
+ncatt_put(ncout, "BEAM_03", "generic_name", "AGC")
+ncatt_put(ncout, "BEAM_04", "generic_name", "AGC")
+ncatt_put(ncout, "UNKN_01", "generic_name", "PGd")
+ncatt_put(ncout, "UNKN_02", "generic_name", "PGd")
+ncatt_put(ncout, "UNKN_03", "generic_name", "PGd")
+ncatt_put(ncout, "UNKN_04", "generic_name", "PGd")
+ncatt_put(ncout, "hght", "generic_name", "height")
+ncatt_put(ncout, "hght", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "hght", "sensor_depth", adp[['depthMean']])
+ncatt_put(ncout, "hght", "serial_number", adp[['serialNumber']])
+ncatt_put(ncout, "D", "generic_name", "depth")
+ncatt_put(ncout, "D", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "D", "sensor_depth", adp[['depthMean']])
+ncatt_put(ncout, "D", "serial_number", adp[['serialNumber']])
+ncatt_put(ncout, "Tx", "generic_name", "temp")
+ncatt_put(ncout, "Tx", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "Tx", "sensor_depth", adp[['depthMean']])
+ncatt_put(ncout, "Tx", "serial_number", adp[['serialNumber']])
+
+
+
+
 #CF convention attributes from template
-#https://www.nodc.noaa.gov/data/formats/netcdf/v2.0/
 ncatt_put(ncout, 0, "instrument", "")
 ncatt_put(ncout, 0, "platform", "")
 ncatt_put(ncout, 0, "title", "")
@@ -157,7 +289,7 @@ ncatt_put(ncout, 0, "project", "")
 ncatt_put(ncout, 0, "processing_level", "")
 ncatt_put(ncout, 0, "metadata_link", "")
 ncatt_put(ncout, 0, "references", "")
-ncatt_put(ncout, 0, "keywords_vocabulary", "")            #https://wiki.earthdata.nasa.gov/display/CMR/GCMD+Keyword+Access
+ncatt_put(ncout, 0, "keywords_vocabulary", "")
 ncatt_put(ncout, 0, "keywords", "")
 ncatt_put(ncout, 0, "acknowledgement", "")
 ncatt_put(ncout, 0, "comment", "")
@@ -182,21 +314,101 @@ ncatt_put(ncout, 0 , "flag_values", "")
 
 
 #BODC P01 names
-#https://www.bodc.ac.uk/resources/vocabularies/vocabulary_search/P01/
-ncatt_put(ncout, "EWCT", "P01_name", "LCEWAP01")
-ncatt_put(ncout, "NSCT", "P01_name", "LCDAAP01")
-ncatt_put(ncout, "VCSP", "P01_name", "LRZAAP01")
-ncatt_put(ncout, "ERRV", "P01_name", "LERRAP01")
-ncatt_put(ncout, "BEAM_01", "P01_name", "TNIHCE01")
-ncatt_put(ncout, "BEAM_02", "P01_name", "TNIHCE02")
-ncatt_put(ncout, "BEAM_03", "P01_name", "TNIHCE03")
-ncatt_put(ncout, "BEAM_04", "P01_name", "TNIHCE04")
+ncatt_put(ncout, "EWCT", "sdn_parameter_urn", "SDN:P01::LCEWAP01")
+ncatt_put(ncout, "NSCT", "sdn_parameter_urn", "SDN:P01::LCNSAP01")
+ncatt_put(ncout, "VSCP", "sdn_parameter_urn", "SDN:P01::LRZAAP01")
+ncatt_put(ncout, "ERRV", "sdn_parameter_urn", "SDN:P01::LERRAP01")
+ncatt_put(ncout, "BEAM_01", "sdn_parameter_urn", "SDN:P01::ASAMAP00")
+ncatt_put(ncout, "BEAM_02", "sdn_parameter_urn", "SDN:P01::ASAMAP02")
+ncatt_put(ncout, "BEAM_03", "sdn_parameter_urn", "SDN:P01::ASAMAP03")
+ncatt_put(ncout, "BEAM_04", "sdn_parameter_urn", "SDN:P01::ASAMAP04")
+ncatt_put(ncout, "UNKN_01", "sdn_parameter_urn", "SDN:P01::PCGDAP00")
+ncatt_put(ncout, "UNKN_02", "sdn_parameter_urn", "SDN:P01::PCGDAP02")
+ncatt_put(ncout, "UNKN_03", "sdn_parameter_urn", "SDN:P01::PCGDAP03")
+ncatt_put(ncout, "UNKN_04", "sdn_parameter_urn", "SDN:P01::PCGDAP04")
+#ncatt_put(ncout, "hght", "sdn_parameter_urn", "SDN:P01::")
+ncatt_put(ncout, "D", "sdn_parameter_urn", "SDN:P01::ADEPZZ01")
+ncatt_put(ncout, "Tx", "sdn_parameter_urn", "SDN:P01::TEMPPR01")
+#ncatt_put(ncout, "time_02", "sdn_parameter_urn", "SDN:P01::")
+ncatt_put(ncout, "PITCH", "sdn_parameter_urn", "SDN:P01::PTCHEI01")
+ncatt_put(ncout, "ROLL", "sdn_parameter_urn", "SDN:P01::ROLLFEI01")
+ncatt_put(ncout, "lon", "sdn_parameter_urn", "SDN:P01::ALONZZ01")
+ncatt_put(ncout, "lat", "sdn_parameter_urn", "SDN:P01::ALATZZ01")
 
-#CF standard names 
-#http://cfconventions.org/Data/cf-conventions/cf-conventions-1.6/build/cf-conventions.html#idp4625472
+
+
+ncatt_put(ncout, "EWCT", "sdn_parameter_name", "Eastward current velocity (Eulerian) in the water body by moored acoustic doppler current profiler (ADCP)")
+ncatt_put(ncout, "NSCT", "sdn_parameter_name", "Northward current velocity (Eulerian) in the water body by moored acoustic doppler current profiler (ADCP)")
+ncatt_put(ncout, "VSCP", "sdn_parameter_name", "Upward current velocity in the water body by moored acoustic doppler current profiler (ADCP)")
+ncatt_put(ncout, "ERRV", "sdn_parameter_name", "Current velocity error in the water body by moored acoustic doppler current profiler (ADCP)")
+ncatt_put(ncout, "BEAM_01", "sdn_parameter_name", "Signal return amplitude from the water body by moored acoustic doppler current profiler (ADCP) beam 1")
+ncatt_put(ncout, "BEAM_02", "sdn_parameter_name", "Signal return amplitude from the water body by moored acoustic doppler current profiler (ADCP) beam 2")
+ncatt_put(ncout, "BEAM_03", "sdn_parameter_name", "Signal return amplitude from the water body by moored acoustic doppler current profiler (ADCP) beam 3")
+ncatt_put(ncout, "BEAM_04", "sdn_parameter_name", "Signal return amplitude from the water body by moored acoustic doppler current profiler (ADCP) beam 4")
+ncatt_put(ncout, "UNKN_01", "sdn_parameter_name", "Acceptable proportion of signal returns by moored acoustic doppler current profiler (ADCP) beam 1")
+ncatt_put(ncout, "UNKN_02", "sdn_parameter_name", "Acceptable proportion of signal returns by moored acoustic doppler current profiler (ADCP) beam 2")
+ncatt_put(ncout, "UNKN_03", "sdn_parameter_name", "Acceptable proportion of signal returns by moored acoustic doppler current profiler (ADCP) beam 3")
+ncatt_put(ncout, "UNKN_04", "sdn_parameter_name", "Acceptable proportion of signal returns by moored acoustic doppler current profiler (ADCP) beam 4")
+#ncatt_put(ncout, "hght", "sdn_parameter_name", "")
+ncatt_put(ncout, "D", "sdn_parameter_name", "Depth below surface of the water body")
+ncatt_put(ncout, "Tx", "sdn_parameter_name", "Temperature of the water body")
+#ncatt_put(ncout, "time_02", "sdn_parameter_name", "")
+ncatt_put(ncout, "PITCH", "sdn_parameter_name", "Orientation (pitch) of measurement platform by inclinometer")
+ncatt_put(ncout, "ROLL", "sdn_parameter_name", "Orientation (roll angle) of measurement platform by inclinometer (second sensor)")
+ncatt_put(ncout, "lon", "sdn_parameter_name", "Longitude east")
+ncatt_put(ncout, "lat", "sdn_parameter_name", "Latitude north")
+
+
+
+
+ncatt_put(ncout, "EWCT", "sdn_uom_urn", "SDN:P06::UVAA")
+ncatt_put(ncout, "NSCT", "sdn_uom_urn", "SDN:P06::UVAA")
+ncatt_put(ncout, "VSCP", "sdn_uom_urn", "SDN:P06::UVAA")
+ncatt_put(ncout, "ERRV", "sdn_uom_urn", "SDN:P06::UVAA")
+ncatt_put(ncout, "BEAM_01", "sdn_uom_urn", "SDN:P06::UCNT")
+ncatt_put(ncout, "BEAM_02", "sdn_uom_urn", "SDN:P06::UCNT")
+ncatt_put(ncout, "BEAM_03", "sdn_uom_urn", "SDN:P06::UCNT")
+ncatt_put(ncout, "BEAM_04", "sdn_uom_urn", "SDN:P06::UCNT")
+ncatt_put(ncout, "UNKN_01", "sdn_uom_urn", "SDN:P06::UPCT")
+ncatt_put(ncout, "UNKN_02", "sdn_uom_urn", "SDN:P06::UPCT")
+ncatt_put(ncout, "UNKN_03", "sdn_uom_urn", "SDN:P06::UPCT")
+ncatt_put(ncout, "UNKN_04", "sdn_uom_urn", "SDN:P06::UPCT")
+ncatt_put(ncout, "hght", "sdn_uom_urn", "SDN:P06::ULAA")
+ncatt_put(ncout, "D", "sdn_uom_urn", "SDN:P06:ULAA")
+ncatt_put(ncout, "Tx", "sdn_uom_urn", "SDN:P06::UPAA")
+#ncatt_put(ncout, "time_02", "sdn_uom_urn", "")
+ncatt_put(ncout, "PITCH", "sdn_uom_urn", "SDN:P06:UAAA")
+ncatt_put(ncout, "ROLL", "sdn_uom_urn", "SDN:P06:UAAA")
+ncatt_put(ncout, "lon", "sdn_uom_urn", "SDN:P06::DEGE")
+ncatt_put(ncout, "lat", "sdn_uom_urn", "SDN:P06:DEGN")
+
+
+ncatt_put(ncout, "EWCT", "sdn_uom_name", "Metres per second")
+ncatt_put(ncout, "NSCT", "sdn_uom_name", "Metres per second")
+ncatt_put(ncout, "VSCP", "sdn_uom_name", "Metres per second")
+ncatt_put(ncout, "ERRV", "sdn_uom_name", "Metres per second")
+ncatt_put(ncout, "BEAM_01", "sdn_uom_name", "Counts")
+ncatt_put(ncout, "BEAM_02", "sdn_uom_name", "Counts")
+ncatt_put(ncout, "BEAM_03", "sdn_uom_name", "Counts")
+ncatt_put(ncout, "BEAM_04", "sdn_uom_name", "Counts")
+ncatt_put(ncout, "UNKN_01", "sdn_uom_name", "Percent")
+ncatt_put(ncout, "UNKN_02", "sdn_uom_name", "Percent")
+ncatt_put(ncout, "UNKN_03", "sdn_uom_name", "Percent")
+ncatt_put(ncout, "UNKN_04", "sdn_uom_name", "Percent")
+ncatt_put(ncout, "hght", "sdn_uom_name", "Metres")
+ncatt_put(ncout, "D", "sdn_uom_name", "Metres")
+ncatt_put(ncout, "Tx", "sdn_uom_name", "Celsius degree")
+#ncatt_put(ncout, "time_02", "sdn_uom_name", "")
+ncatt_put(ncout, "PITCH", "sdn_uom_name", "Degrees")
+ncatt_put(ncout, "ROLL", "sdn_uom_name", "Degrees")
+ncatt_put(ncout, "lon", "sdn_uom_name", "Degrees east")
+ncatt_put(ncout, "lat", "sdn_uom_name", "Degrees north")
+
+
+#CF standard names
 ncatt_put(ncout, "EWCT", "standard_name", "eastward_sea_water_velocity")
 ncatt_put(ncout, "NSCT", "standard_name", "northward_sea_water_velocity")
-ncatt_put(ncout, "VCSP", "standard_name", "upward_sea_water_velocity")
+ncatt_put(ncout, "VSCP", "standard_name", "upward_sea_water_velocity")
 ncatt_put(ncout, "ERRV", "standard_name", "")
 ncatt_put(ncout, "BEAM_01", "standard_name", "sound_intensity_level_in_water")
 ncatt_put(ncout, "BEAM_02", "standard_name", "sound_intensity_level_in_water")
@@ -208,26 +420,63 @@ ncatt_put(ncout, "UNKN_03", "standard_name", "")
 ncatt_put(ncout, "UNKN_04", "standard_name", "")
 ncatt_put(ncout, "lat", "standard_name", "latitude")
 ncatt_put(ncout, "lon", "standard_name", "longitude")
-ncatt_put(ncout, "dist", "poitive", "down")     #direction of depth axis
-ncatt_put(ncout, "dist", "axis", "y")
+ncatt_put(ncout, "hght", "standard_name", "")
+ncatt_put(ncout, "D", "standard_name", "depth")
+ncatt_put(ncout, "Tx", "standard_name", "")
+
+ncatt_put(ncout, "depth", "poitive", "down")     #direction of depth axis
+ncatt_put(ncout, "depth", "axis", "y")
 ncatt_put(ncout, "time", "axis", "x")
-ncatt_put(ncout, "EWCT", "valid_max", "")    #use min/ max or range
-ncatt_put(ncout, "EWCT", "valid_min", "")
+ncatt_put(ncout, "EWCT", "valid_max", max(adp[['v']][,,1], na.rm = TRUE))    
+ncatt_put(ncout, "EWCT", "valid_min", min(adp[['v']][,,1], na.rm = TRUE))
 ncatt_put(ncout, "EWCT", "valid_range", "")
+ncatt_put(ncout, "NSCT", "valid_max", max(adp[['v']][,,2], na.rm = TRUE))    
+ncatt_put(ncout, "NSCT", "valid_min", min(adp[['v']][,,2], na.rm = TRUE))
 ncatt_put(ncout, "NSCT", "valid_range", "")
-ncatt_put(ncout, "VCSP", "valid_range", "")
-ncatt_put(ncout, "ERRV", "valid_max", "")      # eg 0.46 m/sec max error v
-ncatt_put(ncout, "BEAM_01", "valid_min", "")  
-ncatt_put(ncout, "BEAM_02", "valid_min", "")
-ncatt_put(ncout, "BEAM_03", "valid_min", "")
-ncatt_put(ncout, "BEAM_04", "valid_min", "")
-ncatt_put(ncout, "UNKN_01", "valid_min", "")      # eg min 25 % good
-ncatt_put(ncout, "UNKN_02", "valid_min", "")
-ncatt_put(ncout, "UNKN_03", "valid_min", "")
-ncatt_put(ncout, "UNKN_04", "valid_min", "")
+ncatt_put(ncout, "VSCP", "valid_max", max(adp[['v']][,,3], na.rm = TRUE))    
+ncatt_put(ncout, "VSCP", "valid_min", min(adp[['v']][,,3], na.rm = TRUE))
+ncatt_put(ncout, "VSCP", "valid_range", "")
+ncatt_put(ncout, "ERRV", "valid_max", max(adp[['v']][,,4], na.rm = TRUE))    
+ncatt_put(ncout, "ERRV", "valid_min", min(adp[['v']][,,4], na.rm = TRUE))
+ncatt_put(ncout, "ERRV", "valid_range", "")      
+ncatt_put(ncout, "BEAM_01", "valid_min", min(adp[['a', 'numeric']][,,1], na.rm= TRUE))
+ncatt_put(ncout, "BEAM_01", "valid_range", "")
+ncatt_put(ncout, "BEAM_01", "valid_max", max(adp[['a', 'numeric']][,,1], na.rm= TRUE))
+ncatt_put(ncout, "BEAM_02", "valid_min", min(adp[['a' ,'numeric']][,,2], na.rm= TRUE))
+ncatt_put(ncout, "BEAM_02", "valid_range", "")
+ncatt_put(ncout, "BEAM_02", "valid_max", max(adp[['a', 'numeric']][,,2], na.rm= TRUE))
+ncatt_put(ncout, "BEAM_03", "valid_min", min(adp[['a', 'numeric']][,,3], na.rm= TRUE))
+ncatt_put(ncout, "BEAM_03", "valid_range", "")
+ncatt_put(ncout, "BEAM_03", "valid_max", max(adp[['a', 'numeric']][,,3], na.rm= TRUE))
+ncatt_put(ncout, "BEAM_04", "valid_min", min(adp[['a', 'numeric']][,,4], na.rm= TRUE))
+ncatt_put(ncout, "BEAM_04", "valid_range", "")
+ncatt_put(ncout, "BEAM_04", "valid_max", max(adp[['a', 'numeric']][,,4], na.rm= TRUE))
+ncatt_put(ncout, "UNKN_01", "valid_min", min(adp[['g', 'numeric']][,,1], na.rm= TRUE))
+ncatt_put(ncout, "UNKN_01", "valid_range", "")
+ncatt_put(ncout, "UNKN_01", "valid_max", max(adp[['g', 'numeric']][,,1], na.rm= TRUE))# eg min 25 % good
+ncatt_put(ncout, "UNKN_02", "valid_min", min(adp[['g', 'numeric']][,,2], na.rm= TRUE))
+ncatt_put(ncout, "UNKN_02", "valid_range", "")
+ncatt_put(ncout, "UNKN_02", "valid_max", max(adp[['g' ,'numeric']][,,2], na.rm= TRUE))
+ncatt_put(ncout, "UNKN_03", "valid_min", min(adp[['g' ,'numeric']][,,3], na.rm= TRUE))
+ncatt_put(ncout, "UNKN_03", "valid_range", "")
+ncatt_put(ncout, "UNKN_03", "valid_max", max(adp[['g', 'numeric']][,,3], na.rm= TRUE))
+ncatt_put(ncout, "UNKN_04", "valid_min", min(adp[['g', 'numeric']][,,4], na.rm= TRUE))
+ncatt_put(ncout, "UNKN_04", "valid_range", "")
+ncatt_put(ncout, "UNKN_04", "valid_max", max(adp[['g', 'numeric']][,,4], na.rm= TRUE))
+
+ncatt_put(ncout, "hght", "valid_min", min(adp[['depth', 'numeric']]))
+ncatt_put(ncout, "hght", "valid_range", "")
+ncatt_put(ncout, "hght", "valid_max", max(adp[['depth', 'numeric']]))
+ncatt_put(ncout, "D", "valid_min", "")
+ncatt_put(ncout, "D", "valid_range", "")
+ncatt_put(ncout, "D", "valid_max", "")
+ncatt_put(ncout, "Tx", "valid_min", min(adp[['temperature']]))
+ncatt_put(ncout, "Tx", "valid_range", "")
+ncatt_put(ncout, "Tx", "valid_max", max(adp[['temperature']]))
 
 
-#summary and close
+
+
 ncout
 
 nc_close(ncout)
