@@ -34,37 +34,22 @@ depth <- adp[['depth']]
 #on the beam angle of intsrument and depth of deployment
 #[ source :RDI primer for ADCP data]
 
-
 #depth threshold
 
 #beam angle translated to radians
 deg2rad <- function(deg) {(deg * pi) / (180)}
-beamAngle <- deg2rad(adp[['beamAngle']])
 
 
 #RDI primer equation for maximum acceptable data range
-rmax <- depth *(cos(beamAngle))
+rmax <- depth *(cos(deg2rad(adp[['beamAngle']])))
 
-#create an array of maximum data range
-dim = dim(v)
-rarray <- array(FALSE, dim = dim)
+#create matrix of maximum acceptable depth
+r <- matrix(rmax, ncol=length(adp[['distance']]), nrow=length(rmax))
 
-for (j in 1:50 ){
-  for( k in 1:4) {
-    rarray[,j,k] <- rmax
-  }
-}
 
-#create an array of distance (adp to surface)
+#create matrix of distance (adp to surface)
 dist <- adp[['distance']]
-darray <- array(FALSE, dim = dim)
-
-for (i in 1:22190){
-  for( k in 1:4){
-    darray[i,,k] <- dist
-  }
-}
-
+d <- t(matrix(dist, ncol = length(adp[['time']]), nrow = length(dist)))
 
 #read in pg per beam
 g <- adp[['g', "numeric"]]
@@ -75,26 +60,18 @@ lowpg <- g[,,1]+g[,,4]
 #extract error velocities
 ERRV <- adp[['v']][,,4]
 
-#create array of low percent good and high error velocities
-#(using absolute value of erro velocity)
-v2flag <- array(FALSE, dim= dim)
+#create array of flagged values based on low percent good, high error velocity or surface contamination
+dim = dim(v)
+flag <- array(FALSE, dim= dim)
 for (i in 1:4)
-  v2flag[,,i] <- (lowpg<25) | (abs(ERRV) > 0.46) 
-
-#create array which flags distance values larger than maximum data range OR 
-#values flagged due to low percent good OR
-#values flagged due to high error velocity
+  flag[,,i] <- (lowpg<25) | (abs(ERRV) > 0.46) | r < d
 
 
-FFFF<- array(FALSE, dim = dim)
-FFFF <- rarray < darray | v2flag[TRUE]
-
-
-#insert flag array into adp object
-adp[['vFlag']] <- FFFF
-#converts flagged values to NA in velocity components(see ?handleFlags,adp-method in oce documentation)
+#insert and handle flags
+adp[['vFlag']] <- flag
 adp <- handleFlags(adp)
 plot(adp, which = 1)
+
 
 ####trim time when transducer was out of water (pre and post deployment)
 #plot start of time series
