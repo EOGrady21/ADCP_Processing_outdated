@@ -1,11 +1,12 @@
 library(oce)
 
 ####read data####
+#raw <- list.files(path = ".", pattern = "*.000")
 
-adp <- read.adp("M1840000.000", latitude = 48, longitude =45 ) #insert lat and lon from mooring logs
+adp <- read.adp("M1996000.000", latitude = 44.149019, longitude = -63.101821 ) #insert lat and lon from mooring logs
 
 #read data in again and leave in raw to compare when processing
-adp_raw <- read.adp("M1840000.000")
+adp_raw <- read.adp("M1996000.000")
 
 
 #####load initial variables####
@@ -15,24 +16,26 @@ lat <- adp[['latitude']]
 lon <- adp[['longitude']]
 depth <- adp[['depth']]
 
+
+###set metadata from log sheets
+
+adp <- oceSetMetadata(adp, "mooringSeparation", value = 0, note = "taken from log sheet")
+
+
+
 ####Create flags for data outside bounds
 #threshold based on BIO standards, 
 #flag (FFFF) :
 #minimum percent good, flag <- PG1 +PG4 < 25 |
 #maximum error velocity, flag <- ERRV > 0.46 m/sec | 
-#surface contamination, flag <- depth > rmax, where rmax =  (D*cos(beamAngle)) 
-
-# minimum percent good 
-# beams 1 + 4 > 25, represents percent good of 3 beam solutions plus 4 beam solutions
+#surface contamination, flag <- depth > rmax (D*cos(beamAngle)) [ source :RDI primer for ADCP data]
+####Thresholding data to prevent spikes or bad data with interference####
+#thresholding is done by setting minimum percent good on data
+# minimum of 25 % good on beams 1 + 4, represents percent good of 3 beam solutions plus 4 beam solutions
 # source: BIO scientists (documentation:)
 #threshold of error velocities
-# flag any data with error velocities higher than 1.5 ft/sec or 0.46 m/sec 
-#subject to change depending on a variety of factors including instrument frequency, water mode, etc
+# null/ flag any data with error velocities higher than 1.5 ft/sec or 0.46 m/sec depending on a variety of factors
 #source: USGS, documentation: https://water.usgs.gov/admin/memo/SW/OSW.2002.03.htm
-#surface contamination
-#maximum acceptable data range avoiding surface contamination is based
-#on the beam angle of intsrument and depth of deployment
-#[ source :RDI primer for ADCP data]
 
 #depth threshold
 
@@ -72,7 +75,6 @@ adp[['vFlag']] <- flag
 adp <- handleFlags(adp)
 plot(adp, which = 1)
 
-
 ####trim time when transducer was out of water (pre and post deployment)
 #plot start of time series
 plot(subset(adp, time < mean(range(adp[['time']]))-10e6), which = 1)
@@ -81,11 +83,9 @@ plot(subset(adp, time > mean(range(adp[['time']]))+10e6), which = 1)
 
 #check mooring logs for exact time to deployment / retrieval
 
-#instrument time in numeric POSIXct
-SYTM <- as.numeric(adp[['time']])
 
 #insert bottom time from log sheet
-t_first <- as.POSIXct("2013-07-04 12:21:00", tz = 'UTC')
+t_first <- as.POSIXct("2016-09-16 15:16:00", tz = 'UTC')
 t_first <- as.numeric(t_first)
 
 t <- adp[['time', "numeric"]]
@@ -93,15 +93,15 @@ t <- as.numeric(t, tz = 'UTC')
 
 #cut off data before bottom deployment
 adp[['v']][t < t_first] <- NA
-     
+
 
 #retrieval time
-t_final <- as.POSIXct("2014-07-07 11:28:00, tz = 'UTC")
+t_final <- as.POSIXct("2017-11-24 18:48:00, tz = 'UTC")
 t_final <- as.numeric(t_final)
 
 #cut off data after recovery
 adp[['v']][t > t_final] <- NA
-      
+
 
 #plot again to visually check data cut off
 #plot start of time series
@@ -111,67 +111,70 @@ plot(subset(adp, time > mean(range(adp[['time']]))+10e6), which = 1)
 
 
 #### pressure to depth####
-  # pressure data from ADCP is converted into depth of seawater using swDepth function,
-  # depth data can also be acessed by oce package directly, although this data is not corrected for specific temperature and pressure. 
-  #Depth is plotted over time series to check for drift or bad data from movement of mooring or transducer
-  # Depth is averaged over entire deployment.
-  
+# pressure data from ADCP is converted into depth of seawater using swDepth function,
+# depth data can also be acessed by oce package directly, although this data is not corrected for specific temperature and pressure. 
+# pre and post deployment data is removed based on depth < 0 (above water surface).
+#Depth is plotted over time series to check for drift or bad data from movement of mooring or transducer
+# Depth is averaged over entire deployment.
+
 
 #using swDepth
-d <- swDepth(pressure, latitude = lat, eos = getOption("oceEOS", default = "gsw"))
+depth <- swDepth(pressure, latitude = lat, eos = getOption("oceEOS", default = "gsw"))
 
 #plot subset, visually check for drift
-plot(subset(depth, depth >0))
+depth_trimmed <- (subset(depth, depth > rmax))
 
 #average depth data
 meanDepth_oce <- adp[['depthMean']] #calculated by oce / instrument
 
-meanDepth_trimmed <- mean(depth) #calculated after trimming surafce/erroneous data
+meanDepth_trimmed <- mean(depth_trimmed) #calculated after swDepth correction and depth trimming
 
 #optional if data is drifting
-  #depth <- subset(depth, depth < meanDepth+2)
+#depth <- subset(depth, depth < meanDepth+2)
 
 
 ####Transducer depth calculations using mooring separation or oce script####
 #subtract mooring separation distance (source: log sheet, units = m)
-mooringSep <- 3
-transDepth <- meanDepth - mooringSep
+mooringSep <- adp[['mooringSeparation']]
+transDepth <- meanDepth_trimmed - mooringSep
 
-#compare to oce output
-transducerDepth <- adp[['transducerDepth']]
+#compare to oce output #often does not come out properly
+#transducerDepth <- adp[['transducerDepth']]
 
 ####Bin 1 calculations####
-  #distance to bin 1 is extracted from adp class file in oce, 
-  #transducer depth is subtracted to find the mean depth of the first bin
+#distance to bin 1 is extracted from adp class file in oce, 
+#bin 1 depth is equal to transducer depth minus distance to bin 1
 
 #distance to bin 1
 distanceToBin1 <- adp[['bin1Distance']]
 
 #bin 1 distance - transducer depth
-bin1Depth <- distanceToBin1 - transducerDepth
+bin1Depth <- transDepth - distanceToBin1
 
 
 ####Correction for magnetic variation over time series###
-   #magnetic declination is calculated and applied to data series
-   #method 1 shows magnetic declination averaged between start and end dates
-   #method 2 shows magnetic declination calculated as a time series
-   
+#magnetic declination is calculated and applied to data series
+#method 1 shows magnetic declination averaged between start and end dates
+#method 2 shows magnetic declination calculated as a time series
+
 
 #start and end times
-startTime <- adp[['time']][1]
-endTime <- max(adp[['time']])
+startTime <- as.POSIXct(t_first, tz = 'UTC', origin = '1970-01-01 00:00:00')
+endTime <- as.POSIXct(t_final, tz = 'UTC', origin = '1970-01-01 00:00:00')
 
 #method 1
-  #magnetic declination calculation at start and end of deployment using oce
-  mStart <- magneticField(lon, lat, startTime)
-  mEnd <- magneticField(lon, lat, endTime)
+#magnetic declination calculation at start and end of deployment using oce
+mStart <- magneticField(lon, lat, startTime)
+mEnd <- magneticField(lon, lat, endTime)
 
-  #averaging start and end declinations
-  mAvg <- round(mean(c(mStart$declination, mEnd$declination)), digits = 2)
+#averaging start and end declinations
+mAvg <- round(mean(c(mStart$declination, mEnd$declination)), digits = 2)
 
-  #applying declination to velocity data
-adp <- oceSetMetadata(adp, 'oceCoordinate', 'xyz')
-adp <- xyzToEnu(adp, declination = mAvg)
+#applying declination to velocty data
+
+adp <- toEnuAdp(adp, declination = mAvg)
+adp <- oceSetMetadata(adp, "magneticVariation", mAvg)
+
 
 
 #Method 2
@@ -179,6 +182,8 @@ adp <- xyzToEnu(adp, declination = mAvg)
 #
 #
 #
+
+
 
 
 
@@ -196,7 +201,7 @@ PG3 <- adp[['g', 'numeric']][,,3]
 PG4 <- adp[['g', 'numeric']][,,4]
 
 #flags on velocity values
-flag
+FFFF
 #adp@metadata$flags$FFFF
 
 #onboard sensor data #correct variable names?
@@ -204,5 +209,4 @@ TEMP <- adp[['temperature']]  #temperature
 BEAM <- adp[['a']]            #average echo intensity
 PITCH <- adp[['pitch']]       #pitch
 ROLL <- adp[['roll']]         #roll
-
 
