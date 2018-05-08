@@ -20,6 +20,12 @@ depth <- adp[['depth']]
 ###set metadata from log sheets
 
 adp <- oceSetMetadata(adp, "mooringSeparation", value = 0, note = "taken from log sheet")
+adp <- oceSetMetadata(adp, "mooringNumber", value = "", note = "taken from log sheet")
+adp <- oceSetMetadata(adp, "deploymentTime", value = "2016-09-16 15:16:00 UTC")
+adp <- oceSetMetadata(adp, "recoveryTime", value = "2017-11-24 18:48:00 UTC")
+adp <- oceSetMetadata(adp, "chiefScientist", value = "")
+adp <- oceSetMetadata(adp, "project", value = "")
+
 
 
 
@@ -66,7 +72,7 @@ ERRV <- adp[['v']][,,4]
 #create array of flagged values based on low percent good, high error velocity or surface contamination
 dim = dim(v)
 flag <- array(FALSE, dim= dim)
-for (i in 1:4)
+for (i in 1:3)
   flag[,,i] <- (lowpg<25) | (abs(ERRV) > 0.46) | r < d
 
 
@@ -85,7 +91,7 @@ plot(subset(adp, time > mean(range(adp[['time']]))+10e6), which = 1)
 
 
 #insert bottom time from log sheet
-t_first <- as.POSIXct("2016-09-16 15:16:00", tz = 'UTC')
+t_first <- as.POSIXct(adp[['deploymentTime']], tz = 'UTC')
 t_first <- as.numeric(t_first)
 
 t <- adp[['time', "numeric"]]
@@ -96,7 +102,7 @@ adp[['v']][t < t_first] <- NA
 
 
 #retrieval time
-t_final <- as.POSIXct("2017-11-24 18:48:00, tz = 'UTC")
+t_final <- as.POSIXct(adp[['recoveryTime']], tz = 'UTC')
 t_final <- as.numeric(t_final)
 
 #cut off data after recovery
@@ -123,6 +129,9 @@ depth <- swDepth(pressure, latitude = lat, eos = getOption("oceEOS", default = "
 
 #plot subset, visually check for drift
 depth_trimmed <- (subset(depth, depth > rmax))
+
+#null depths outside of bounds
+depth[depth < rmax] <- NA
 
 #average depth data
 meanDepth_oce <- adp[['depthMean']] #calculated by oce / instrument
