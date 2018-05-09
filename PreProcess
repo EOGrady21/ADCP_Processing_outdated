@@ -181,7 +181,7 @@ mAvg <- round(mean(c(mStart$declination, mEnd$declination)), digits = 2)
 
 #applying declination to velocty data
 
-adp <- toEnuAdp(adp, declination = mAvg)
+adp <- enuToOther(adp, heading = mAvg)
 adp <- oceSetMetadata(adp, "magneticVariation", mAvg)
 
 
