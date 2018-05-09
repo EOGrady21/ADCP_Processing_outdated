@@ -183,6 +183,7 @@ mAvg <- round(mean(c(mStart$declination, mEnd$declination)), digits = 2)
 
 adp <- enuToOther(adp, heading = mAvg)
 adp <- oceSetMetadata(adp, "magneticVariation", mAvg)
+adp <- oceSetMetadata(adp, "oceCoordinate", "enu")
 
 
 
