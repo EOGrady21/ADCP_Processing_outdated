@@ -1,12 +1,12 @@
 library(oce)
 
 ####read data####
-#raw <- list.files(path = ".", pattern = "*.000")
+raw <- list.files(path = ".", pattern = "*.000")
 
-adp <- read.adp("M1996000.000", latitude = 44.149019, longitude = -63.101821 ) #insert lat and lon from mooring logs
+adp <- read.adp(raw, latitude = 44.149019, longitude = -63.101821 ) #insert lat and lon from mooring logs
 
 #read data in again and leave in raw to compare when processing
-adp_raw <- read.adp("M1996000.000")
+adp_raw <- read.adp(raw)
 
 
 #####load initial variables####
@@ -134,7 +134,7 @@ depth_trimmed <- (subset(depth, depth > rmax))
 depth[depth < rmax] <- NA
 
 #average depth data
-meanDepth_oce <- adp[['depthMean']] #calculated by oce / instrument
+#meanDepth_oce <- adp[['depthMean']] #calculated by oce / instrument (inaccurate)
 
 meanDepth_trimmed <- mean(depth_trimmed) #calculated after swDepth correction and depth trimming
 
@@ -211,8 +211,7 @@ PG3 <- adp[['g', 'numeric']][,,3]
 PG4 <- adp[['g', 'numeric']][,,4]
 
 #flags on velocity values
-FFFF
-#adp@metadata$flags$FFFF
+FFFF <- adp[['flags']]
 
 #onboard sensor data #correct variable names?
 TEMP <- adp[['temperature']]  #temperature
