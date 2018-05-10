@@ -1,0 +1,682 @@
+library(oce)
+library(ncdf4)
+
+####read data####
+raw <- list.files(path = ".", pattern = "*.000")
+
+adp <- read.adp(raw, latitude = 44.149019, longitude = -63.101821 ) #insert lat and lon from mooring logs
+
+#read data in again and leave in raw to compare when processing
+adp_raw <- read.adp(raw)
+
+
+#####load initial variables####
+v <- adp[['v']]
+pressure <- adp[['pressure']]
+lat <- adp[['latitude']] 
+lon <- adp[['longitude']]
+depth <- adp[['depth']]
+
+###set metadata from log sheets
+
+adp <- oceSetMetadata(adp, "mooringSeparation", '0', note = "taken from log sheet")
+adp <- oceSetMetadata(adp, "mooringNumber",  "", note = "taken from log sheet")
+adp <- oceSetMetadata(adp, "deploymentTime", "2016-09-16 15:16:00 UTC")
+adp <- oceSetMetadata(adp, "recoveryTime",  "2017-11-24 18:48:00 UTC")
+adp <- oceSetMetadata(adp, "chiefScientist", "Herbert")
+adp <- oceSetMetadata(adp, "project",  "NS current")
+adp <- oceSetMetadata(adp,"organization", "BIO")
+adp <- oceSetMetadata(adp, "cruiseName", "")
+adp <- oceSetMetadata(adp, "cruiseDescription", "")
+adp <- oceSetMetadata(adp, "countryCode", "")
+adp <- oceSetMetadata(adp, "cruiseNumber", "HUD2016027")
+adp <- oceSetMetadata(adp, "platform", "M1996")
+adp <- oceSetMetadata(adp, "dataType", "ADCP")
+adp <- oceSetMetadata(adp, "eventNumber", "")
+adp <- oceSetMetadata(adp, "eventQualifier", "")
+adp <- oceSetMetadata(adp, "samplingInterval", "")
+adp <- oceSetMetadata(adp, "sounding", "163m")
+adp <- oceSetMetadata(adp, "depthOffBottom", "")
+adp <- oceSetMetadata(adp, "eventComments", "")
+adp <- oceSetMetadata(adp, "model", "WH")
+adp <- oceSetMetadata(adp, "flagValues", "0,1,2,3,4,5,8,9")
+adp <- oceSetMetadata(adp, "flagMeaning", "No_quality_control_has_been_performed_on_this_element Element_appears_to_be_correct Element_appears_to_be_inconsistent_with_other_elements Element_appears_to_be_doubtful Element_appears_to_be_erroneous The_value_of_this_element_has_been_changed Quality_control_has_been_performed_by_the_originator The_value_of_the_element_is_missing")
+adp <- oceSetMetadata(adp, "flagReferences", "http://www.iode.org/mg22")
+adp <- oceSetMetadata(adp, "seaName", "")
+adp <- oceSetMetadata(adp, "program", "AZMP")
+adp <- oceSetMetadata(adp, "institution", "BIO")
+adp <- oceSetMetadata(adp, "creatorName", "R. Pettipas")
+adp <- oceSetMetadata(adp, "creatorUrl", "")
+adp <- oceSetMetadata(adp, "creatorEmail", "")
+adp <- oceSetMetadata(adp, "processingLevel", "")
+adp <- oceSetMetadata(adp, "waterDepth", "")
+adp <- oceSetMetadata(adp, 'pingInterval', '3 sec')
+
+
+
+####Create flags for data outside bounds
+#threshold based on BIO standards, 
+#flag (FFFF) :
+#minimum percent good, flag <- PG1 +PG4 < 25 |
+#maximum error velocity, flag <- ERRV > 0.46 m/sec | 
+#surface contamination, flag <- depth > rmax (D*cos(beamAngle)) [ source :RDI primer for ADCP data]
+####Thresholding data to prevent spikes or bad data with interference####
+#thresholding is done by setting minimum percent good on data
+# minimum of 25 % good on beams 1 + 4, represents percent good of 3 beam solutions plus 4 beam solutions
+# source: BIO scientists (documentation:)
+#threshold of error velocities
+# null/ flag any data with error velocities higher than 1.5 ft/sec or 0.46 m/sec depending on a variety of factors
+#source: USGS, documentation: https://water.usgs.gov/admin/memo/SW/OSW.2002.03.htm
+
+#depth threshold
+
+#beam angle translated to radians
+deg2rad <- function(deg) {(deg * pi) / (180)}
+
+
+#RDI primer equation for maximum acceptable data range
+rmax <- depth *(cos(deg2rad(adp[['beamAngle']])))
+
+#create matrix of maximum acceptable depth
+r <- matrix(rmax, ncol=length(adp[['distance']]), nrow=length(rmax))
+
+
+#create matrix of distance (adp to surface)
+dist <- adp[['distance']]
+d <- t(matrix(dist, ncol = length(adp[['time']]), nrow = length(dist)))
+
+#read in pg per beam
+g <- adp[['g', "numeric"]]
+
+#combine beam 1 and 4
+lowpg <- g[,,1]+g[,,4]
+
+#extract error velocities
+ERRV <- adp[['v']][,,4]
+
+#create array of flagged values based on low percent good, high error velocity or surface contamination
+dim = dim(v)
+flag <- array(0, dim= dim)
+for (i in 1:3)
+  flag[,,i] <- (lowpg<25) | (abs(ERRV) > 0.46) | r < d
+flag[flag > 0] <- 4
+
+#insert and handle flags
+adp[['vFlag']] <- flag
+adp <- handleFlags(adp, flags = 4, actions = list('NA'))
+plot(adp, which = 1)
+
+####trim time when transducer was out of water (pre and post deployment)
+#plot start of time series
+plot(subset(adp, time < mean(range(adp[['time']]))-10e6), which = 1)
+#plot end of time series
+plot(subset(adp, time > mean(range(adp[['time']]))+10e6), which = 1)
+
+
+#extract deploymentTime
+t_first <- as.POSIXct(adp[['deploymentTime']], tz = 'UTC')
+t_first <- as.numeric(t_first)
+
+t <- adp[['time', "numeric"]]
+t <- as.numeric(t, tz = 'UTC')
+
+#cut off data before bottom deployment
+adp[['v']][t < t_first] <- NA
+
+
+#recovery time
+t_final <- as.POSIXct(adp[['recoveryTime']], tz = 'UTC')
+t_final <- as.numeric(t_final)
+
+#cut off data after recovery
+adp[['v']][t > t_final] <- NA
+
+
+#plot again to visually check data cut off
+#plot start of time series
+plot(subset(adp, time < mean(range(adp[['time']]))-10e6), which = 1)
+#plot end of time series
+plot(subset(adp, time > mean(range(adp[['time']]))+10e6), which = 1)
+
+
+
+#### pressure to depth####
+# pressure data from ADCP is converted into depth of seawater using swDepth function,
+# depth data can also be acessed by oce package directly, although this data is not corrected for specific temperature and pressure. 
+# pre and post deployment data is removed based on depth < 0 (above water surface).
+#Depth is plotted over time series to check for drift or bad data from movement of mooring or transducer
+# Depth is averaged over entire deployment.
+
+
+#using swDepth
+depth <- swDepth(pressure, latitude = lat, eos = getOption("oceEOS", default = "gsw"))
+
+#plot subset, visually check for drift
+depth_trimmed <- (subset(depth, depth > rmax))
+
+
+#null depths outside of bounds
+depth[depth < rmax] <- NA
+
+#average depth data
+#meanDepth_oce <- adp[['depthMean']] #calculated by oce / instrument (inaccurate)
+
+meanDepth_trimmed <- mean(depth_trimmed) #calculated after swDepth correction and depth trimming
+adp <- oceSetMetadata(adp, 'sensorDepth', meanDepth_trimmed )
+
+#optional if data is drifting
+#depth <- subset(depth, depth < meanDepth+2)
+
+
+####Transducer depth calculations using mooring separation or oce script####
+#subtract mooring separation distance (source: log sheet, units = m)
+transDepth <- meanDepth_trimmed - as.numeric(adp[['mooringSeparation']])
+
+#compare to oce output #often does not come out properly
+#transducerDepth <- adp[['transducerDepth']]
+
+####Bin 1 calculations####
+#distance to bin 1 is extracted from adp class file in oce, 
+#bin 1 depth is equal to transducer depth minus distance to bin 1
+
+#distance to bin 1
+distanceToBin1 <- adp[['bin1Distance']]
+
+#bin 1 distance - transducer depth
+bin1Depth <- transDepth - distanceToBin1
+
+
+####Correction for magnetic variation over time series###
+#magnetic declination is calculated and applied to data series
+#method 1 shows magnetic declination averaged between start and end dates
+#method 2 shows magnetic declination calculated as a time series
+
+
+#start and end times
+startTime <- as.POSIXct(t_first, tz = 'UTC', origin = '1970-01-01 00:00:00')
+endTime <- as.POSIXct(t_final, tz = 'UTC', origin = '1970-01-01 00:00:00')
+
+#method 1
+#magnetic declination calculation at start and end of deployment using oce
+mStart <- magneticField(lon, lat, startTime)
+mEnd <- magneticField(lon, lat, endTime)
+
+#averaging start and end declinations
+mAvg <- round(mean(c(mStart$declination, mEnd$declination)), digits = 2)
+
+#applying declination to velocty data
+
+adp <- enuToOther(adp, heading = mAvg)
+adp <- oceSetMetadata(adp, "magneticVariation", mAvg)
+adp <- oceSetMetadata(adp, "oceCoordinate", "enu")
+
+
+####export data to netCDF####
+
+####file name####
+#file name and path
+ncpath <- "./"
+#file.remove('ADP_test.nc')
+ncname <- "MADCP_HUD2016027_1996_TEST01"
+ncfname <- paste(ncpath, ncname, ".nc", sep = "")
+
+####setting dimensions and definitions####
+#dimension variables from adp object
+time <- adp[['time']]
+dist <- adp[['distance', 'numeric']]
+lon <- adp[['longitude']]
+lat <- adp[['latitude']]
+
+#create dimensions
+timedim <- ncdim_def("time", "julian", as.double(time))
+depthdim <- ncdim_def("depth", "m", as.double(dist))
+londim <- ncdim_def("lon", "degrees_east" , as.double(lon))
+latdim <- ncdim_def("lat", "degrees_north", as.double(lat))
+
+#set fill value
+FillValue <- 1e35
+
+#define variables
+dlname <- "eastward_sea_water_velocity"
+u_def <- ncvar_def("EWCT", "m/sec", list(timedim, depthdim, londim, latdim), FillValue, dlname, prec = "float")
+
+dlname <- "northward_sea_water_velocity"
+v_def <- ncvar_def("NSCT", "m/sec", list(timedim, depthdim, londim, latdim), FillValue, dlname, prec = "float")
+
+dlname <- "upward_sea_water_velocity"
+w_def <- ncvar_def("VSCP", "m/sec", list(timedim, depthdim, londim, latdim), FillValue, dlname, prec = "float")
+
+dlname <- "time_02"
+t_def <- ncvar_def("SYTM", "POSIXct", list(timedim, londim, latdim), FillValue, dlname, prec = "float")
+
+dlname <- "error_velocity_in_sea_water"
+e_def <- ncvar_def("ERRV", "m/sec", list(timedim, depthdim, londim, latdim), FillValue, dlname, prec = "float")
+
+dlname <- "ADCP_echo_intensity_beam_1"
+b1_def <- ncvar_def("BEAM_01", "a", list(timedim, depthdim, londim, latdim), FillValue, dlname, prec = "float")
+
+dlname <- "ADCP_echo_intensity_beam_2"
+b2_def <- ncvar_def("BEAM_02", "a", list(timedim, depthdim, londim, latdim), FillValue, dlname, prec = "float")
+
+dlname <- "ADCP_echo_intensity_beam_3"
+b3_def <- ncvar_def("BEAM_03", "a", list(timedim, depthdim, londim, latdim), FillValue, dlname, prec = "float")
+
+dlname <- "ADCP_echo_intensity_beam_4"
+b4_def <- ncvar_def("BEAM_04", "a", list(timedim, depthdim, londim, latdim), FillValue, dlname, prec = "float")
+
+dlname <- "percent_good_beam_1"
+pg1_def <- ncvar_def("UNKN_01", "counts", list(timedim, depthdim, londim, latdim), FillValue, dlname, prec = "float")
+
+dlname <- "percent_good_beam_2"
+pg2_def <- ncvar_def("UNKN_02", "counts", list(timedim, depthdim, londim, latdim), FillValue, dlname, prec = "float")
+
+dlname <- "percent_good_beam_3"
+pg3_def <- ncvar_def("UNKN_03", "counts", list(timedim, depthdim, londim, latdim), FillValue, dlname, prec = "float")
+
+dlname <- "percent_good_beam_4"
+pg4_def <- ncvar_def("UNKN_04", "counts", list(timedim, depthdim, londim, latdim), FillValue, dlname, prec = "float")
+
+dlname <- "pitch"
+p_def <- ncvar_def("PITCH", "degrees", list(timedim, londim, latdim), FillValue, dlname, prec = "float")
+
+dlname <- "roll"
+r_def <- ncvar_def("ROLL", "degrees", list(timedim, londim, latdim), FillValue, dlname, prec = "float")
+
+dlname <- "height of sea surface"
+hght_def <- ncvar_def("hght", "m", list(timedim, londim, latdim), FillValue, dlname, prec = "float")
+
+dlname <- "ADCP Transducer Temp."
+Tx_def <- ncvar_def("Tx", "degrees", list(timedim, londim, latdim), FillValue, dlname, prec = "float")
+
+dlname <- "instrument depth"
+D_def <- ncvar_def("D", "m", list(timedim, londim, latdim), FillValue, dlname, prec = "float")
+
+
+dlname <- "quality_flag u"
+qc_u_def <- ncvar_def("QC_flag_u", "", list(timedim, depthdim, londim, latdim), FillValue, dlname, prec = "float")
+
+dlname <- "quality_flag v"
+qc_v_def <- ncvar_def("QC_flag_v", "", list(timedim, depthdim, londim, latdim), FillValue, dlname, prec = "float")
+
+dlname <- "quality_flag w"
+qc_w_def <- ncvar_def("QC_flag_w", "", list(timedim, depthdim, londim, latdim), FillValue, dlname, prec = "float")
+
+####writing net CDF####
+#write out definitions to new nc file
+ncout <- nc_create(ncfname, list(u_def, v_def, w_def, e_def, t_def, b1_def, b2_def, b3_def, b4_def, pg1_def, pg2_def, pg3_def, pg4_def, p_def, r_def, hght_def, Tx_def, D_def, qc_u_def, qc_v_def, qc_w_def), force_v4 = TRUE)
+
+#insert variables into nc file
+ncvar_put(ncout, u_def, adp[['v']][,,1])
+ncvar_put(ncout, v_def, adp[['v']][,,2])
+ncvar_put(ncout, w_def, adp[['v']][,,3])
+ncvar_put(ncout, e_def, adp[['v']][,,4])
+ncvar_put(ncout, t_def, adp[['time']])
+ncvar_put(ncout, b1_def, adp[['a', 'numeric']][,,1])
+ncvar_put(ncout, b2_def, adp[['a', 'numeric']][,,2])
+ncvar_put(ncout, b3_def, adp[['a', 'numeric']][,,3])
+ncvar_put(ncout, b4_def, adp[['a', 'numeric']][,,4])
+ncvar_put(ncout, pg1_def, adp[['g', 'numeric']][,,1])
+ncvar_put(ncout, pg2_def, adp[['g', 'numeric']][,,2])
+ncvar_put(ncout, pg3_def, adp[['g', 'numeric']][,,3])
+ncvar_put(ncout, pg4_def, adp[['g', 'numeric']][,,4])
+ncvar_put(ncout, p_def, adp[['pitch']])
+ncvar_put(ncout, r_def, adp[['roll']])
+ncvar_put(ncout, hght_def, adp[['depth']])
+ncvar_put(ncout, Tx_def, adp[['temperature']])
+ncvar_put(ncout, D_def, adp[['depth']])
+ncvar_put(ncout, qc_u_def, flag[,,1])
+ncvar_put(ncout, qc_v_def, flag[,,2])
+ncvar_put(ncout, qc_w_def, flag[,,3])
+
+###metadata###
+
+####pulled from adp object####
+ncatt_put(ncout, 0, "MOORING", adp[['mooring']])
+ncatt_put(ncout, 0, "Deployment_date", adp[['deploymentTime']])
+ncatt_put(ncout, 0, "Recovery_date", adp[['recoveryTime']])
+ncatt_put(ncout, 0, "firmware_version", adp[['firmwareVersion']])
+ncatt_put(ncout, 0, "frequency", adp[['frequency']])
+ncatt_put(ncout, 0, "beam_pattern", adp[['beamPattern']])
+ncatt_put(ncout, 0, "janus", adp[['numberOfBeams']])
+ncatt_put(ncout, 0, "pings_per_ensemble", adp[['pingsPerEnsemble']])
+ncatt_put(ncout, 0, "valid_correlation_range", adp[['lowCorrThresh']])
+ncatt_put(ncout, 0, "minmax_percent_good", adp[['percentGdMinimum']])
+ncatt_put(ncout, 0,"minmax_percent_good", "100")
+ncatt_put(ncout, 0, "error_velocity_threshold", adp[['errorVelocityMaximum']])
+ncatt_put(ncout, 0, "transmit_pulse_length_cm", adp[['xmitPulseLength']])
+ncatt_put(ncout, 0, "false_target_reject_values", adp[['falseTargetThresh']])
+ncatt_put(ncout, 0, "ADCP_serial_number", adp[['serialNumber']])
+ncatt_put(ncout, 0, "transform", adp[['oceCoordinate']])
+ncatt_put(ncout, 0, "DATA_TYPE", adp[['instrumentType']])
+ncatt_put(ncout, 0, "COORD_SYSTEM", adp[['oceCoordinate']])
+ncatt_put(ncout, 0, "longitude", adp[['longitude']])
+ncatt_put(ncout, 0, "latitude", adp[['latitude']])
+ncatt_put(ncout, 0, "magnetic_variation", adp[['magneticVariation']])
+ncatt_put(ncout, 0, "platform", adp[['platform']])
+ncatt_put(ncout, 0, "sounding", adp[['sounding']])
+ncatt_put(ncout, 0, "chief_scientist", adp[['chiefScientist']])
+ncatt_put(ncout, "depth", "xducer_offset_from_bottom", adp[['transducerDepth']])
+ncatt_put(ncout, "depth", "bin_size", adp[['cellSize']])
+ncatt_put(ncout, "EWCT", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "EWCT", "sensor_depth", adp[['sensorDepth']])
+ncatt_put(ncout, "EWCT", "serial_number", adp[['serialNumber']])
+ncatt_put(ncout, "NSCT", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "NSCT", "sensor_depth", adp[['sensorDepth']])
+ncatt_put(ncout, "NSCT", "serial_number", adp[['serialNumber']])
+ncatt_put(ncout, "VSCP", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "VSCP", "sensor_depth", adp[['sensorDepth']])
+ncatt_put(ncout, "VSCP", "serial_number", adp[['serialNumber']])
+ncatt_put(ncout, "ERRV", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "ERRV", "sensor_depth", adp[['sensorDepth']])
+ncatt_put(ncout, "ERRV", "serial_number", adp[['serialNumber']])
+ncatt_put(ncout, "BEAM_01", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "BEAM_01", "sensor_depth", adp[['sensorDepth']])
+ncatt_put(ncout, "BEAM_01", "serial_number", adp[['serialNumber']])
+ncatt_put(ncout, "BEAM_02", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "BEAM_02", "sensor_depth", adp[['sensorDepth']])
+ncatt_put(ncout, "BEAM_02", "serial_number", adp[['serialNumber']])
+ncatt_put(ncout, "BEAM_03", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "BEAM_03", "sensor_depth", adp[['sensorDepth']])
+ncatt_put(ncout, "BEAM_03", "serial_number", adp[['serialNumber']])
+ncatt_put(ncout, "BEAM_04", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "BEAM_04", "sensor_depth", adp[['depthMean']])
+ncatt_put(ncout, "BEAM_04", "serial_number", adp[['serialNumber']])
+ncatt_put(ncout, "UNKN_01", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "UNKN_01", "sensor_depth", adp[['sensorDepth']])
+ncatt_put(ncout, "UNKN_01", "serial_number", adp[['serialNumber']])
+ncatt_put(ncout, "UNKN_02", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "UNKN_02", "sensor_depth", adp[['sensorDepth']])
+ncatt_put(ncout, "UNKN_02", "serial_number", adp[['serialNumber']])
+ncatt_put(ncout, "UNKN_03", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "UNKN_03", "sensor_depth", adp[['sensorDepth']])
+ncatt_put(ncout, "UNKN_03", "serial_number", adp[['serialNumber']])
+ncatt_put(ncout, "UNKN_04", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "UNKN_04", "sensor_depth", adp[['sensorDepth']])
+ncatt_put(ncout, "UNKN_04", "serial_number", adp[['serialNumber']])
+ncatt_put(ncout, "EWCT", "generic_name", "u")
+ncatt_put(ncout, "NSCT", "generic_name", "v")
+ncatt_put(ncout, "VSCP", "generic_name", "w")
+ncatt_put(ncout, "ERRV", "generic_name", "w")       #issue in current NC protocol
+ncatt_put(ncout, "BEAM_01", "generic_name", "AGC")
+ncatt_put(ncout, "BEAM_02", "generic_name", "AGC")
+ncatt_put(ncout, "BEAM_03", "generic_name", "AGC")
+ncatt_put(ncout, "BEAM_04", "generic_name", "AGC")
+ncatt_put(ncout, "UNKN_01", "generic_name", "PGd")
+ncatt_put(ncout, "UNKN_02", "generic_name", "PGd")
+ncatt_put(ncout, "UNKN_03", "generic_name", "PGd")
+ncatt_put(ncout, "UNKN_04", "generic_name", "PGd")
+ncatt_put(ncout, "hght", "generic_name", "height")
+ncatt_put(ncout, "hght", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "hght", "sensor_depth", adp[['depthMean']])
+ncatt_put(ncout, "hght", "serial_number", adp[['serialNumber']])
+ncatt_put(ncout, "D", "generic_name", "depth")
+ncatt_put(ncout, "D", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "D", "sensor_depth", adp[['depthMean']])
+ncatt_put(ncout, "D", "serial_number", adp[['serialNumber']])
+ncatt_put(ncout, "Tx", "generic_name", "temp")
+ncatt_put(ncout, "Tx", "sensor_type", adp[['instrumentType']])
+ncatt_put(ncout, "Tx", "sensor_depth", adp[['depthMean']])
+ncatt_put(ncout, "Tx", "serial_number", adp[['serialNumber']])
+ncatt_put(ncout, "QC_flag_u", "comment", "Quality flag resulting from quality control")
+ncatt_put(ncout, "QC_flag_u", "flag_meanings",adp[['flagMeaning']])
+ncatt_put(ncout, "QC_flag_u", "flag_values", adp[['flagValues']])
+ncatt_put(ncout, "QC_flag_u", "References", adp[['flagReferences']])
+ncatt_put(ncout, "QC_flag_v", "comment", "Quality flag resulting from quality control")
+ncatt_put(ncout, "QC_flag_v", "flag_meanings", adp[['flagMeaning']])
+ncatt_put(ncout, "QC_flag_v", "flag_values", adp[['flagValues']])
+ncatt_put(ncout, "QC_flag_v", "References", adp[['flagReferences']])
+ncatt_put(ncout, "QC_flag_w", "comment", "Quality flag resulting from quality control")
+ncatt_put(ncout, "QC_flag_w", "flag_meanings", adp[['flagMeaning']])
+ncatt_put(ncout, "QC_flag_w", "flag_values", adp[['flagValues']])
+ncatt_put(ncout, "QC_flag_w", "References", adp[['flagReferences']])
+ncatt_put(ncout, 0, "DATA_ORIGIN", adp[['institution']])
+ncatt_put(ncout, 0, "WATER_DEPTH", adp[['waterDepth']])
+ncatt_put(ncout, 0, "DELTA_T_sec",adp[['TimeOffset']])
+ncatt_put(ncout, 0, "pred_accuracy", adp[['velocityResolution']])
+#CF conventions
+ncatt_put(ncout, 0, "creator_type", "person")
+ncatt_put(ncout, 0, "creator_institution", adp[['institution']])
+ncatt_put(ncout, 0, "program", adp[['program']])  
+ncatt_put(ncout, "depth", "blanking_dist", "")
+ncatt_put(ncout, 0, "sea_name", adp[['seaName']])
+ncatt_put(ncout, 0, "time_coverage_start", adp[['deploymentTime']])
+ncatt_put(ncout, 0, "time_coverage_end", adp[['recoveryTime']])
+ncatt_put(ncout, 0, "geospatial_lat_min", adp[['latitude']])
+ncatt_put(ncout, 0, "geospatial_lat_max", adp[['latitude']])
+ncatt_put(ncout, 0, "geospatial_lon_min", adp[['longitude']])
+ncatt_put(ncout, 0, "geosptial_lon_max", adp[['longitude']])
+ncatt_put(ncout, 0, "geosptial_lon_units", "degrees_east")
+ncatt_put(ncout, 0, "geospatial_vertical_min", min(depth_trimmed))
+ncatt_put(ncout, 0, "geosptial_vertical_max", max(depth_trimmed))
+ncatt_put(ncout, 0, "geosptial_vertical_units", "metres")
+ncatt_put(ncout, 0, "geosptial_vertical_positive", adp[['orientation']])     #eg up or down
+ncatt_put(ncout, 0, "institution", adp[['institution']])
+ncatt_put(ncout, 0, "creator_name", adp[['creatorName']])
+ncatt_put(ncout, 0, "creator_url", adp[['creatorUrl']])
+ncatt_put(ncout, 0, "creator_email", adp[['creatorEmail']])
+ncatt_put(ncout, 0, "project", adp[['project']])
+ncatt_put(ncout, 0, "processing_level", adp[['processingLevel']])
+ncatt_put(ncout, 0 , "flag_meanings", adp[['flagMeaning']])
+ncatt_put(ncout, 0 , "flag_values", adp[['flagValues']])
+
+
+
+
+####enter manually####
+ncatt_put(ncout, 0, "depth_note", "")
+ncatt_put(ncout, 0, "DATA_SUBTYPE", "moored")
+ncatt_put(ncout, 0, "POS_CONST", "")
+ncatt_put(ncout, 0, "DEPTH_CONST", "")
+ncatt_put(ncout, 0, "DRIFTER", "")
+ncatt_put(ncout, 0, "EXPERIMENT", "")
+ncatt_put(ncout, 0, "COMPOSITIE", "")
+ncatt_put(ncout, 0, "VAR_DESC", "u:v:w:Werr:AGC:PGd:Tx")
+#ncatt_put(ncout, 0, "start_time", "")
+#ncatt_put(ncout, 0, "stop_time", "")
+
+#CFconventions
+ncatt_put(ncout, 0, "title", "NS current")
+ncatt_put(ncout, 0, "conventions", "CF v51 , P01")
+ncatt_put(ncout, 0, "naming_authority", "")
+ncatt_put(ncout, 0, "geospatial_bounds", "")
+ncatt_put(ncout, 0, "geospatial_bounds_crs", "")
+ncatt_put(ncout, 0, "geospatial_bounds_vertical_crs", "")
+#ncatt_put(ncout, 0, "publisher_type", "")
+#ncatt_put(ncout, 0, "publisher_institution", "")
+ncatt_put(ncout, 0, "date_metadata_modified", "2018-05-10")
+#ncatt_put(ncout, 0, "instrument_vocabulary", "")
+#ncatt_put(ncout, 0, "platform_vocabulary", "")
+ncatt_put(ncout, 0, "source", "R code: adcpProcess, github:")      # eg Python script
+ncatt_put(ncout, 0, "featureType", "timeSeriesProfile")    #eg. Time series
+ncatt_put(ncout, 0, "cdm_data_type", "Mooring")     # eg station
+ncatt_put(ncout, 0, "standard_name_vocabulary", "CF standard name table v 51")    #eg CF standard name table v30
+ncatt_put(ncout, 0, "uuid", "")
+ncatt_put(ncout, 0, "time_coverage_resolution", "")
+ncatt_put(ncout, 0, "metadata_link", "")
+ncatt_put(ncout, 0, "references", "")
+ncatt_put(ncout, 0, "keywords_vocabulary", "")
+ncatt_put(ncout, 0, "keywords", "")
+ncatt_put(ncout, 0, "acknowledgement", "")
+ncatt_put(ncout, 0, "comment", "THIS IS A TEST")
+#ncatt_put(ncout, 0, "contributor_name", "")
+#ncatt_put(ncout, 0, "contributor_role", "")
+ncatt_put(ncout, 0, "date_created", '2018-05-10')
+ncatt_put(ncout, 0, "date_modified", date())
+ncatt_put(ncout, 0, "date_issued", "")
+#ncatt_put(ncout, 0, "publisher_name", "")
+#ncatt_put(ncout, 0, "publisher_email", "")
+#ncatt_put(ncout, 0, "publisher_url", "")
+#ncatt_put(ncout, 0, "license", "")
+ncatt_put(ncout, 0, "time_coverage_duration", "")
+ncatt_put(ncout, 0, "history", "Processed with BIO standards, produced to final NetCDF")
+ncatt_put(ncout,0, "Fillvalue", "1e32")
+#ncatt_put(ncout, 0, "cell_measures", "")
+#ncatt_put(ncout, 0 , "cell_methods", "")
+#ncatt_put(ncout, 0 , "coordinates", "")
+
+
+
+#BODC P01 names
+ncatt_put(ncout, "EWCT", "sdn_parameter_urn", "SDN:P01::LCEWAP01")
+ncatt_put(ncout, "NSCT", "sdn_parameter_urn", "SDN:P01::LCNSAP01")
+ncatt_put(ncout, "VSCP", "sdn_parameter_urn", "SDN:P01::LRZAAP01")
+ncatt_put(ncout, "ERRV", "sdn_parameter_urn", "SDN:P01::LERRAP01")
+ncatt_put(ncout, "BEAM_01", "sdn_parameter_urn", "SDN:P01::ASAMAP00")
+ncatt_put(ncout, "BEAM_02", "sdn_parameter_urn", "SDN:P01::ASAMAP02")
+ncatt_put(ncout, "BEAM_03", "sdn_parameter_urn", "SDN:P01::ASAMAP03")
+ncatt_put(ncout, "BEAM_04", "sdn_parameter_urn", "SDN:P01::ASAMAP04")
+ncatt_put(ncout, "UNKN_01", "sdn_parameter_urn", "SDN:P01::PCGDAP00")
+ncatt_put(ncout, "UNKN_02", "sdn_parameter_urn", "SDN:P01::PCGDAP02")
+ncatt_put(ncout, "UNKN_03", "sdn_parameter_urn", "SDN:P01::PCGDAP03")
+ncatt_put(ncout, "UNKN_04", "sdn_parameter_urn", "SDN:P01::PCGDAP04")
+#ncatt_put(ncout, "hght", "sdn_parameter_urn", "SDN:P01::")
+ncatt_put(ncout, "D", "sdn_parameter_urn", "SDN:P01::ADEPZZ01")
+ncatt_put(ncout, "Tx", "sdn_parameter_urn", "SDN:P01::TEMPPR01")
+#ncatt_put(ncout, "time_02", "sdn_parameter_urn", "SDN:P01::")
+ncatt_put(ncout, "PITCH", "sdn_parameter_urn", "SDN:P01::PTCHEI01")
+ncatt_put(ncout, "ROLL", "sdn_parameter_urn", "SDN:P01::ROLLFEI01")
+ncatt_put(ncout, "lon", "sdn_parameter_urn", "SDN:P01::ALONZZ01")
+ncatt_put(ncout, "lat", "sdn_parameter_urn", "SDN:P01::ALATZZ01")
+
+
+
+ncatt_put(ncout, "EWCT", "sdn_parameter_name", "Eastward current velocity (Eulerian) in the water body by moored acoustic doppler current profiler (ADCP)")
+ncatt_put(ncout, "NSCT", "sdn_parameter_name", "Northward current velocity (Eulerian) in the water body by moored acoustic doppler current profiler (ADCP)")
+ncatt_put(ncout, "VSCP", "sdn_parameter_name", "Upward current velocity in the water body by moored acoustic doppler current profiler (ADCP)")
+ncatt_put(ncout, "ERRV", "sdn_parameter_name", "Current velocity error in the water body by moored acoustic doppler current profiler (ADCP)")
+ncatt_put(ncout, "BEAM_01", "sdn_parameter_name", "Signal return amplitude from the water body by moored acoustic doppler current profiler (ADCP) beam 1")
+ncatt_put(ncout, "BEAM_02", "sdn_parameter_name", "Signal return amplitude from the water body by moored acoustic doppler current profiler (ADCP) beam 2")
+ncatt_put(ncout, "BEAM_03", "sdn_parameter_name", "Signal return amplitude from the water body by moored acoustic doppler current profiler (ADCP) beam 3")
+ncatt_put(ncout, "BEAM_04", "sdn_parameter_name", "Signal return amplitude from the water body by moored acoustic doppler current profiler (ADCP) beam 4")
+ncatt_put(ncout, "UNKN_01", "sdn_parameter_name", "Acceptable proportion of signal returns by moored acoustic doppler current profiler (ADCP) beam 1")
+ncatt_put(ncout, "UNKN_02", "sdn_parameter_name", "Acceptable proportion of signal returns by moored acoustic doppler current profiler (ADCP) beam 2")
+ncatt_put(ncout, "UNKN_03", "sdn_parameter_name", "Acceptable proportion of signal returns by moored acoustic doppler current profiler (ADCP) beam 3")
+ncatt_put(ncout, "UNKN_04", "sdn_parameter_name", "Acceptable proportion of signal returns by moored acoustic doppler current profiler (ADCP) beam 4")
+#ncatt_put(ncout, "hght", "sdn_parameter_name", "")
+ncatt_put(ncout, "D", "sdn_parameter_name", "Depth below surface of the water body")
+ncatt_put(ncout, "Tx", "sdn_parameter_name", "Temperature of the water body")
+#ncatt_put(ncout, "time_02", "sdn_parameter_name", "")
+ncatt_put(ncout, "PITCH", "sdn_parameter_name", "Orientation (pitch) of measurement platform by inclinometer")
+ncatt_put(ncout, "ROLL", "sdn_parameter_name", "Orientation (roll angle) of measurement platform by inclinometer (second sensor)")
+ncatt_put(ncout, "lon", "sdn_parameter_name", "Longitude east")
+ncatt_put(ncout, "lat", "sdn_parameter_name", "Latitude north")
+
+
+
+
+ncatt_put(ncout, "EWCT", "sdn_uom_urn", "SDN:P06::UVAA")
+ncatt_put(ncout, "NSCT", "sdn_uom_urn", "SDN:P06::UVAA")
+ncatt_put(ncout, "VSCP", "sdn_uom_urn", "SDN:P06::UVAA")
+ncatt_put(ncout, "ERRV", "sdn_uom_urn", "SDN:P06::UVAA")
+ncatt_put(ncout, "BEAM_01", "sdn_uom_urn", "SDN:P06::UCNT")
+ncatt_put(ncout, "BEAM_02", "sdn_uom_urn", "SDN:P06::UCNT")
+ncatt_put(ncout, "BEAM_03", "sdn_uom_urn", "SDN:P06::UCNT")
+ncatt_put(ncout, "BEAM_04", "sdn_uom_urn", "SDN:P06::UCNT")
+ncatt_put(ncout, "UNKN_01", "sdn_uom_urn", "SDN:P06::UPCT")
+ncatt_put(ncout, "UNKN_02", "sdn_uom_urn", "SDN:P06::UPCT")
+ncatt_put(ncout, "UNKN_03", "sdn_uom_urn", "SDN:P06::UPCT")
+ncatt_put(ncout, "UNKN_04", "sdn_uom_urn", "SDN:P06::UPCT")
+ncatt_put(ncout, "hght", "sdn_uom_urn", "SDN:P06::ULAA")
+ncatt_put(ncout, "D", "sdn_uom_urn", "SDN:P06:ULAA")
+ncatt_put(ncout, "Tx", "sdn_uom_urn", "SDN:P06::UPAA")
+#ncatt_put(ncout, "time_02", "sdn_uom_urn", "")
+ncatt_put(ncout, "PITCH", "sdn_uom_urn", "SDN:P06:UAAA")
+ncatt_put(ncout, "ROLL", "sdn_uom_urn", "SDN:P06:UAAA")
+ncatt_put(ncout, "lon", "sdn_uom_urn", "SDN:P06::DEGE")
+ncatt_put(ncout, "lat", "sdn_uom_urn", "SDN:P06:DEGN")
+
+
+ncatt_put(ncout, "EWCT", "sdn_uom_name", "Metres per second")
+ncatt_put(ncout, "NSCT", "sdn_uom_name", "Metres per second")
+ncatt_put(ncout, "VSCP", "sdn_uom_name", "Metres per second")
+ncatt_put(ncout, "ERRV", "sdn_uom_name", "Metres per second")
+ncatt_put(ncout, "BEAM_01", "sdn_uom_name", "Counts")
+ncatt_put(ncout, "BEAM_02", "sdn_uom_name", "Counts")
+ncatt_put(ncout, "BEAM_03", "sdn_uom_name", "Counts")
+ncatt_put(ncout, "BEAM_04", "sdn_uom_name", "Counts")
+ncatt_put(ncout, "UNKN_01", "sdn_uom_name", "Percent")
+ncatt_put(ncout, "UNKN_02", "sdn_uom_name", "Percent")
+ncatt_put(ncout, "UNKN_03", "sdn_uom_name", "Percent")
+ncatt_put(ncout, "UNKN_04", "sdn_uom_name", "Percent")
+ncatt_put(ncout, "hght", "sdn_uom_name", "Metres")
+ncatt_put(ncout, "D", "sdn_uom_name", "Metres")
+ncatt_put(ncout, "Tx", "sdn_uom_name", "Celsius degree")
+#ncatt_put(ncout, "time_02", "sdn_uom_name", "")
+ncatt_put(ncout, "PITCH", "sdn_uom_name", "Degrees")
+ncatt_put(ncout, "ROLL", "sdn_uom_name", "Degrees")
+ncatt_put(ncout, "lon", "sdn_uom_name", "Degrees east")
+ncatt_put(ncout, "lat", "sdn_uom_name", "Degrees north")
+
+
+#CF standard names
+ncatt_put(ncout, "EWCT", "standard_name", "eastward_sea_water_velocity")
+ncatt_put(ncout, "NSCT", "standard_name", "northward_sea_water_velocity")
+ncatt_put(ncout, "VSCP", "standard_name", "upward_sea_water_velocity")
+ncatt_put(ncout, "ERRV", "standard_name", "")
+ncatt_put(ncout, "BEAM_01", "standard_name", "sound_intensity_level_in_water")
+ncatt_put(ncout, "BEAM_02", "standard_name", "sound_intensity_level_in_water")
+ncatt_put(ncout, "BEAM_03", "standard_name", "sound_intensity_level_in_water")
+ncatt_put(ncout, "BEAM_04", "standard_name", "sound_intensity_level_in_water")
+ncatt_put(ncout, "UNKN_01", "standard_name", "")
+ncatt_put(ncout, "UNKN_02", "standard_name", "")
+ncatt_put(ncout, "UNKN_03", "standard_name", "")
+ncatt_put(ncout, "UNKN_04", "standard_name", "")
+ncatt_put(ncout, "lat", "standard_name", "latitude")
+ncatt_put(ncout, "lon", "standard_name", "longitude")
+ncatt_put(ncout, "hght", "standard_name", "")
+ncatt_put(ncout, "D", "standard_name", "depth")
+ncatt_put(ncout, "Tx", "standard_name", "")
+
+ncatt_put(ncout, "depth", "poitive", "down")     #direction of depth axis
+ncatt_put(ncout, "depth", "axis", "y")
+ncatt_put(ncout, "time", "axis", "x")
+ncatt_put(ncout, "EWCT", "valid_max", max(adp[['v']][,,1], na.rm = TRUE))    
+ncatt_put(ncout, "EWCT", "valid_min", min(adp[['v']][,,1], na.rm = TRUE))
+ncatt_put(ncout, "EWCT", "valid_range", "")
+ncatt_put(ncout, "NSCT", "valid_max", max(adp[['v']][,,2], na.rm = TRUE))    
+ncatt_put(ncout, "NSCT", "valid_min", min(adp[['v']][,,2], na.rm = TRUE))
+ncatt_put(ncout, "NSCT", "valid_range", "")
+ncatt_put(ncout, "VSCP", "valid_max", max(adp[['v']][,,3], na.rm = TRUE))    
+ncatt_put(ncout, "VSCP", "valid_min", min(adp[['v']][,,3], na.rm = TRUE))
+ncatt_put(ncout, "VSCP", "valid_range", "")
+ncatt_put(ncout, "ERRV", "valid_max", max(adp[['v']][,,4], na.rm = TRUE))    
+ncatt_put(ncout, "ERRV", "valid_min", min(adp[['v']][,,4], na.rm = TRUE))
+ncatt_put(ncout, "ERRV", "valid_range", "")      
+ncatt_put(ncout, "BEAM_01", "valid_min", min(adp[['a', 'numeric']][,,1], na.rm= TRUE))
+ncatt_put(ncout, "BEAM_01", "valid_range", "")
+ncatt_put(ncout, "BEAM_01", "valid_max", max(adp[['a', 'numeric']][,,1], na.rm= TRUE))
+ncatt_put(ncout, "BEAM_02", "valid_min", min(adp[['a' ,'numeric']][,,2], na.rm= TRUE))
+ncatt_put(ncout, "BEAM_02", "valid_range", "")
+ncatt_put(ncout, "BEAM_02", "valid_max", max(adp[['a', 'numeric']][,,2], na.rm= TRUE))
+ncatt_put(ncout, "BEAM_03", "valid_min", min(adp[['a', 'numeric']][,,3], na.rm= TRUE))
+ncatt_put(ncout, "BEAM_03", "valid_range", "")
+ncatt_put(ncout, "BEAM_03", "valid_max", max(adp[['a', 'numeric']][,,3], na.rm= TRUE))
+ncatt_put(ncout, "BEAM_04", "valid_min", min(adp[['a', 'numeric']][,,4], na.rm= TRUE))
+ncatt_put(ncout, "BEAM_04", "valid_range", "")
+ncatt_put(ncout, "BEAM_04", "valid_max", max(adp[['a', 'numeric']][,,4], na.rm= TRUE))
+ncatt_put(ncout, "UNKN_01", "valid_min", min(adp[['g', 'numeric']][,,1], na.rm= TRUE))
+ncatt_put(ncout, "UNKN_01", "valid_range", "")
+ncatt_put(ncout, "UNKN_01", "valid_max", max(adp[['g', 'numeric']][,,1], na.rm= TRUE))# eg min 25 % good
+ncatt_put(ncout, "UNKN_02", "valid_min", min(adp[['g', 'numeric']][,,2], na.rm= TRUE))
+ncatt_put(ncout, "UNKN_02", "valid_range", "")
+ncatt_put(ncout, "UNKN_02", "valid_max", max(adp[['g' ,'numeric']][,,2], na.rm= TRUE))
+ncatt_put(ncout, "UNKN_03", "valid_min", min(adp[['g' ,'numeric']][,,3], na.rm= TRUE))
+ncatt_put(ncout, "UNKN_03", "valid_range", "")
+ncatt_put(ncout, "UNKN_03", "valid_max", max(adp[['g', 'numeric']][,,3], na.rm= TRUE))
+ncatt_put(ncout, "UNKN_04", "valid_min", min(adp[['g', 'numeric']][,,4], na.rm= TRUE))
+ncatt_put(ncout, "UNKN_04", "valid_range", "")
+ncatt_put(ncout, "UNKN_04", "valid_max", max(adp[['g', 'numeric']][,,4], na.rm= TRUE))
+
+ncatt_put(ncout, "hght", "valid_min", min(adp[['depth', 'numeric']]))
+ncatt_put(ncout, "hght", "valid_range", "")
+ncatt_put(ncout, "hght", "valid_max", max(adp[['depth', 'numeric']]))
+ncatt_put(ncout, "D", "valid_min", "")
+ncatt_put(ncout, "D", "valid_range", "")
+ncatt_put(ncout, "D", "valid_max", "")
+ncatt_put(ncout, "Tx", "valid_min", min(adp[['temperature']]))
+ncatt_put(ncout, "Tx", "valid_range", "")
+ncatt_put(ncout, "Tx", "valid_max", max(adp[['temperature']]))
+
+
+ncout
+nc_close(ncout)
