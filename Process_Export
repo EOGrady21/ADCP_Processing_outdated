@@ -94,17 +94,21 @@ lowpg <- g[,,1]+g[,,4]
 #extract error velocities
 ERRV <- adp[['v']][,,4]
 
-#create array of flagged values based on low percent good, high error velocity or surface contamination
+#create logical array of flagged values based on low percent good, high error velocity or surface contamination
 dim = dim(v)
-flag <- array(0, dim= dim)
+flag <- array(FALSE, dim= dim)
 for (i in 1:3)
   flag[,,i] <- (lowpg<25) | (abs(ERRV) > 0.46) | r < d
-flag[flag > 0] <- 4
 
-#insert and handle flags
-adp[['vFlag']] <- flag
+#initialize and set flag scheme
+adp <- initializeFlags(adp, name = 'v', value = 0)
+
+#set adp flags where logical array = TRUE, flag value = 4 (see flag scheme, BODC)
+adp <- setFlags(adp, name = 'v', i= flag, value = 4)
+
+# handle flags
 adp <- handleFlags(adp, flags = 4, actions = list('NA'))
-plot(adp, which = 1)
+
 
 ####trim time when transducer was out of water (pre and post deployment)
 #plot start of time series
@@ -157,6 +161,7 @@ depth_trimmed <- (subset(depth, depth > rmax))
 
 #null depths outside of bounds
 depth[depth < rmax] <- NA
+adp[['depth']] <- depth
 
 #average depth data
 #meanDepth_oce <- adp[['depthMean']] #calculated by oce / instrument (inaccurate)
